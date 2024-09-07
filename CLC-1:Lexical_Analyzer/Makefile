@@ -1,5 +1,5 @@
-lexer: lexer-2.l
-	flex lexer-2.l
+lexer: lexer.l
+	flex lexer.l
 	gcc -o Lexer lex.yy.c -ll
 	./Lexer lexerAnalyzer.gcupl
 	
