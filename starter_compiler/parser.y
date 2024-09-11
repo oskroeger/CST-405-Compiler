@@ -153,27 +153,36 @@ Stmt: ID EQ Expr SEMICOLON {
 	printf("[INFO] Assignment statement recognized: %s = ...;\n", $1);
 }
 	| WRITE ID SEMICOLON {
-		// Look up the symbol to ensure it has been declared
-		Symbol* sym = lookupSymbol(symTab, $2);
-		if (sym == NULL) {
-			fprintf(stderr, "Error: Undeclared variable %s used in write statement at line %d.\n", $2, yylineno);
-			YYABORT;
-		}
+    	// Look up the symbol to ensure it has been declared
+    	Symbol* sym = lookupSymbol(symTab, $2);
+    	if (sym == NULL) {
+        	fprintf(stderr, "Error: Undeclared variable %s used in write statement at line %d.\n", $2, yylineno);
+        	YYABORT;
+    	}
 
-		$$ = malloc(sizeof(ASTNode));
-		if ($$ == NULL) {
-			fprintf(stderr, "Memory allocation failed for WriteStmt node.\n");
-			exit(EXIT_FAILURE);
-		}
-		$$->type = NodeType_WriteStmt;
-		$$->writeStmt.id = strdup($2);
-		if ($$->writeStmt.id == NULL) {
-			fprintf(stderr, "Failed to allocate memory for WriteStmt ID.\n");
-			YYABORT;
-		}
+    	$$ = malloc(sizeof(ASTNode));
+    	if ($$ == NULL) {
+        	fprintf(stderr, "Memory allocation failed for WriteStmt node.\n");
+        	exit(EXIT_FAILURE);
+    	}
+    	$$->type = NodeType_WriteStmt;
+    	$$->writeStmt.id = strdup($2);
+    	if ($$->writeStmt.id == NULL) {
+        	fprintf(stderr, "Failed to allocate memory for WriteStmt ID.\n");
+        	YYABORT;
+    	}
 
-		printf("[INFO] Write statement recognized: write %s;\n", $2);
+    	// Generate TAC for write operation
+    	if ($$->writeStmt.id) {
+        	generateTAC("WRITE", $$->writeStmt.id, NULL, NULL);  // Use the variable name directly
+    	} else {
+        	fprintf(stderr, "Error: NULL operand in WRITE TAC generation.\n");
+        	YYABORT;
+    	}
+
+    	printf("[INFO] Write statement recognized: write %s;\n", $2);
 	}
+
 ;
 
 Expr: Expr PLUS Expr {
@@ -262,7 +271,7 @@ int main() {
 		printTAC();
 
 		// Generate MIPS code from the TAC
-        printf("\n----- GENERATED MIPS CODE -----\n");
+        // printf("\n----- GENERATED MIPS CODE -----\n");
         generateMIPS(tacHead);
 
         // Clean up the AST

@@ -7,7 +7,6 @@
 #include <string.h>
 
 
-int getTempRegister(const char* tempVar);
 void generateMIPS(TAC* head);
 
 #endif // CODE_GENERATOR_H

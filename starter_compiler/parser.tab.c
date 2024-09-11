@@ -526,7 +526,7 @@ static const yytype_int8 yytranslate[] =
 static const yytype_uint8 yyrline[] =
 {
        0,    53,    53,    69,    72,    86,   112,   115,   129,   155,
-     179,   193,   211
+     188,   202,   220
 };
 #endif
 
@@ -1233,32 +1233,40 @@ yyreduce:
   case 9: /* Stmt: WRITE ID SEMICOLON  */
 #line 155 "parser.y"
                              {
-		// Look up the symbol to ensure it has been declared
-		Symbol* sym = lookupSymbol(symTab, (yyvsp[-1].string));
-		if (sym == NULL) {
-			fprintf(stderr, "Error: Undeclared variable %s used in write statement at line %d.\n", (yyvsp[-1].string), yylineno);
-			YYABORT;
-		}
+    	// Look up the symbol to ensure it has been declared
+    	Symbol* sym = lookupSymbol(symTab, (yyvsp[-1].string));
+    	if (sym == NULL) {
+        	fprintf(stderr, "Error: Undeclared variable %s used in write statement at line %d.\n", (yyvsp[-1].string), yylineno);
+        	YYABORT;
+    	}
 
-		(yyval.ast) = malloc(sizeof(ASTNode));
-		if ((yyval.ast) == NULL) {
-			fprintf(stderr, "Memory allocation failed for WriteStmt node.\n");
-			exit(EXIT_FAILURE);
-		}
-		(yyval.ast)->type = NodeType_WriteStmt;
-		(yyval.ast)->writeStmt.id = strdup((yyvsp[-1].string));
-		if ((yyval.ast)->writeStmt.id == NULL) {
-			fprintf(stderr, "Failed to allocate memory for WriteStmt ID.\n");
-			YYABORT;
-		}
+    	(yyval.ast) = malloc(sizeof(ASTNode));
+    	if ((yyval.ast) == NULL) {
+        	fprintf(stderr, "Memory allocation failed for WriteStmt node.\n");
+        	exit(EXIT_FAILURE);
+    	}
+    	(yyval.ast)->type = NodeType_WriteStmt;
+    	(yyval.ast)->writeStmt.id = strdup((yyvsp[-1].string));
+    	if ((yyval.ast)->writeStmt.id == NULL) {
+        	fprintf(stderr, "Failed to allocate memory for WriteStmt ID.\n");
+        	YYABORT;
+    	}
 
-		printf("[INFO] Write statement recognized: write %s;\n", (yyvsp[-1].string));
+    	// Generate TAC for write operation
+    	if ((yyval.ast)->writeStmt.id) {
+        	generateTAC("WRITE", (yyval.ast)->writeStmt.id, NULL, NULL);  // Use the variable name directly
+    	} else {
+        	fprintf(stderr, "Error: NULL operand in WRITE TAC generation.\n");
+        	YYABORT;
+    	}
+
+    	printf("[INFO] Write statement recognized: write %s;\n", (yyvsp[-1].string));
 	}
-#line 1258 "parser.tab.c"
+#line 1266 "parser.tab.c"
     break;
 
   case 10: /* Expr: Expr PLUS Expr  */
-#line 179 "parser.y"
+#line 188 "parser.y"
                      {
 	(yyval.ast) = malloc(sizeof(ASTNode));
 	if ((yyval.ast) == NULL) {
@@ -1272,11 +1280,11 @@ yyreduce:
 
 	printf("[INFO] Expression recognized: ... + ...\n");
 }
-#line 1276 "parser.tab.c"
+#line 1284 "parser.tab.c"
     break;
 
   case 11: /* Expr: ID  */
-#line 193 "parser.y"
+#line 202 "parser.y"
              {
 		// Look up the symbol to ensure it has been declared
 		Symbol* sym = lookupSymbol(symTab, (yyvsp[0].string));
@@ -1295,11 +1303,11 @@ yyreduce:
 
 		printf("[INFO] Identifier recognized: %s\n", (yyvsp[0].string));
 	}
-#line 1299 "parser.tab.c"
+#line 1307 "parser.tab.c"
     break;
 
   case 12: /* Expr: NUMBER  */
-#line 211 "parser.y"
+#line 220 "parser.y"
                  { 
 		(yyval.ast) = malloc(sizeof(ASTNode));
 		if ((yyval.ast) == NULL) {
@@ -1311,11 +1319,11 @@ yyreduce:
 
 		printf("[INFO] Number recognized: %d\n", (yyvsp[0].number));
 	}
-#line 1315 "parser.tab.c"
+#line 1323 "parser.tab.c"
     break;
 
 
-#line 1319 "parser.tab.c"
+#line 1327 "parser.tab.c"
 
       default: break;
     }
@@ -1508,7 +1516,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 224 "parser.y"
+#line 233 "parser.y"
 
 
 int main() {
@@ -1550,7 +1558,7 @@ int main() {
 		printTAC();
 
 		// Generate MIPS code from the TAC
-        printf("\n----- GENERATED MIPS CODE -----\n");
+        // printf("\n----- GENERATED MIPS CODE -----\n");
         generateMIPS(tacHead);
 
         // Clean up the AST
