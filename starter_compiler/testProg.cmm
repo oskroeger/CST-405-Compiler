@@ -1,5 +1,6 @@
 int x;
 int y;
-x = 5;
-x = 10;
-y = x + 3;
+int z;
+x = 3;
+y = 5;
+z = 7;
