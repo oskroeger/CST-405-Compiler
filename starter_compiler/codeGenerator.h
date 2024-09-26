@@ -5,8 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 
-void generateMIPS(TAC* head);
+void generateMIPS(TAC* tacHead);
 
 #endif // CODE_GENERATOR_H

@@ -65,10 +65,28 @@ void generateTAC(const char* operation, const char* result, const char* operand1
 void printTAC() {
     TAC* current = tacHead;
     while (current != NULL) {
-        printf("%s = %s %s %s\n", current->result, current->operand1, current->operation, current->operand2 ? current->operand2 : "");
+        // Ensure that each part of the TAC is checked for NULL to prevent crashes.
+        const char* result = current->result ? current->result : "";
+        const char* operand1 = current->operand1 ? current->operand1 : "";
+        const char* operation = current->operation ? current->operation : "";
+        const char* operand2 = current->operand2 ? current->operand2 : "";
+
+        // Print format depending on operation type.
+        if (strcmp(operation, "MOV") == 0) {
+            // MOV operations usually have one operand.
+            printf("%s = %s %s\n", result, operation, operand1);
+        } else if (strlen(operand2) > 0) {
+            // Print format for binary operations (e.g., ADD, SUB).
+            printf("%s = %s %s %s\n", result, operand1, operation, operand2);
+        } else {
+            // Print format for unary operations (or other types with one operand).
+            printf("%s = %s %s\n", result, operation, operand1);
+        }
+
         current = current->next;
     }
 }
+
 
 
 char* determineExprType(ASTNode* expr, SymbolTable* symTab) {

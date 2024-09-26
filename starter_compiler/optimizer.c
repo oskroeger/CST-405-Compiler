@@ -1,162 +1,142 @@
-#include "semantic.h"
 #include "optimizer.h"
+#include "semantic.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <string.h>
+#include <ctype.h>
 
-void removeUnusedTemporaries(TAC** head) {
-    TAC* current = *head;
-    TAC* prev = NULL;
-
-    while (current != NULL) {
-        TAC* next = current->next;
-
-        // Only remove MOV operations with temp variables that are no longer used
-        if (strcmp(current->operation, "MOV") == 0 && current->result[0] == 't') {
-            int isUsed = 0;
-            TAC* check = *head;
-            while (check != NULL) {
-                if ((check->operand1 && strcmp(check->operand1, current->result) == 0) ||
-                    (check->operand2 && strcmp(check->operand2, current->result) == 0)) {
-                    isUsed = 1;
-                    break;
-                }
-                check = check->next;
-            }
-
-            if (!isUsed) {
-                // Remove the current TAC from the list
-                if (prev == NULL) {
-                    *head = current->next; // Update head if we're removing the first element
-                } else {
-                    prev->next = current->next; // Link previous node to the next one
-                }
-                free(current->result);
-                free(current->operand1);
-                free(current->operand2);
-                free(current);
-                current = next;
-                continue;
-            }
-        }
-        prev = current;
-        current = next;
+// Helper function to create a new TAC node
+TAC* createTAC(const char* operation, const char* result, const char* operand1, const char* operand2) {
+    TAC* newTAC = (TAC*)malloc(sizeof(TAC));
+    if (!newTAC) {
+        fprintf(stderr, "Memory allocation failed for new TAC node.\n");
+        exit(EXIT_FAILURE);
     }
+    newTAC->operation = strdup(operation);
+    newTAC->result = result ? strdup(result) : NULL;
+    newTAC->operand1 = operand1 ? strdup(operand1) : NULL;
+    newTAC->operand2 = operand2 ? strdup(operand2) : NULL;
+    newTAC->next = NULL;
+    return newTAC;
 }
 
-void optimizeTAC() {
-    TAC* current = tacHead;
+
+// Function to replace variables with their corresponding temp registers
+void replaceVariablesWithTemp(TAC** head) {
+    TAC* current = *head;
+    TAC* cleanedHead = NULL;
+
+    // Dictionary to map variables to their corresponding temp vars
+    char* variableMap[100][2]; // Adjust size as needed
+    int mapIndex = 0;
+
     while (current != NULL) {
-        constantFolding(current);
-        copyPropagation(current);
+        // If the current operation is a MOV operation assigning a temp var to a variable, update the map
+        if (strcmp(current->operation, "MOV") == 0 && isVariable(current->result) && isTemp(current->operand1)) {
+            // Store or update the mapping of the variable to its corresponding temp var
+            int found = 0;
+            for (int i = 0; i < mapIndex; i++) {
+                if (strcmp(variableMap[i][0], current->result) == 0) {
+                    free(variableMap[i][1]);
+                    variableMap[i][1] = strdup(current->operand1);
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                variableMap[mapIndex][0] = strdup(current->result);   // Variable name
+                variableMap[mapIndex][1] = strdup(current->operand1); // Corresponding temp var
+                mapIndex++;
+            }
+
+            // Skip adding this MOV to the cleaned TAC since it's just a mapping operation
+            current = current->next;
+            continue;
+        }
+
+        // Replace variable references in operands with their corresponding temp vars from the map
+        char* operand1 = current->operand1;
+        char* operand2 = current->operand2;
+        for (int i = 0; i < mapIndex; i++) {
+            if (operand1 && strcmp(operand1, variableMap[i][0]) == 0) {
+                operand1 = variableMap[i][1];
+            }
+            if (operand2 && strcmp(operand2, variableMap[i][0]) == 0) {
+                operand2 = variableMap[i][1];
+            }
+        }
+
+        // Special handling for WRITE operations
+        if (strcmp(current->operation, "WRITE") == 0) {
+            // If the WRITE operand is a variable, replace it with the corresponding temp register
+            for (int i = 0; i < mapIndex; i++) {
+                if (current->result && strcmp(current->result, variableMap[i][0]) == 0) {
+                    current->result = variableMap[i][1];
+                    break;
+                }
+            }
+        }
+
+        // Create a new TAC with the replaced operands
+        TAC* newTAC = createTAC(current->operation, current->result, operand1, operand2);
+
+        // Append the new TAC to the cleaned list
+        appendTAC(&cleanedHead, newTAC);
+
         current = current->next;
     }
 
-    // Remove unused temporary variables after propagation
-    removeUnusedTemporaries(&tacHead);
-
-    // Final pass to remove redundant MOVs and update final variables correctly
-    eliminateRedundantAssignments(&tacHead);
+    // Update the original head to point to the cleaned TAC list
+    *head = cleanedHead;
 }
 
-void constantFolding(TAC* tac) {
-    if (strcmp(tac->operation, "ADD") == 0 && isConstant(tac->operand1) && isConstant(tac->operand2)) {
-        int val1 = atoi(tac->operand1);
-        int val2 = atoi(tac->operand2);
-        int result = val1 + val2;
 
-        // Convert the result to a string
-        char buffer[20];
-        snprintf(buffer, sizeof(buffer), "%d", result);
-
-        // Debugging Output
-        printf("Constant Folding: %d + %d -> %s\n", val1, val2, buffer);
-
-        // Update the TAC to reflect the constant folding
-        if (tac->operand1) free(tac->operand1);
-        tac->operand1 = strdup(buffer);
-        if (!tac->operand1) {
-            fprintf(stderr, "Memory allocation failed for operand1\n");
-            exit(EXIT_FAILURE);
-        }
-
-        if (tac->operand2) {
-            free(tac->operand2);
-            tac->operand2 = NULL;  // Set to NULL as it's no longer needed
-        }
-
-        strcpy(tac->operation, "MOV");  // Change the operation to MOV
-
-        // Debugging Output After Modification
-        printf("After Folding: operation = %s, operand1 = %s, operand2 = %s\n", tac->operation, tac->operand1, tac->operand2);
+// Function to check if a string is a valid variable name
+bool isVariable(const char* str) {
+    if (str == NULL || *str == '\0') return false;
+    if (!isalpha((unsigned char)*str) && *str != '_') return false;
+    ++str;
+    while (*str) {
+        if (!isalnum((unsigned char)*str) && *str != '_') return false;
+        ++str;
     }
+    return true;
 }
 
-void copyPropagation(TAC* tac) {
-    TAC* current = tacHead;
-    while (current != NULL) {
-        if (strcmp(current->operation, "MOV") == 0) {
-            // Replace usage of the result of MOV with the operand1 in subsequent TACs
-            if (tac->operand1 && strcmp(current->result, tac->operand1) == 0) {
-                free(tac->operand1);
-                tac->operand1 = strdup(current->operand1);
-            }
-
-            if (tac->operand2 && strcmp(current->result, tac->operand2) == 0) {
-                free(tac->operand2);
-                tac->operand2 = strdup(current->operand1);
-            }
-        }
-        current = current->next;
-    }
+// Function to check if a string is a temporary variable (e.g., "t0", "t1", etc.)
+bool isTemp(const char* str) {
+    return str && str[0] == 't' && isdigit((unsigned char)str[1]);
 }
 
-void eliminateRedundantAssignments(TAC** head) {
-    TAC* current = *head;
-    TAC* prev = NULL;
-
-    while (current != NULL) {
-        TAC* next = current->next;
-
-        if (strcmp(current->operation, "MOV") == 0) {
-            TAC* check = next;
-            int isRedundant = 0;
-
-            // Check if there is another assignment to the same variable later
-            while (check != NULL) {
-                if (strcmp(check->operation, "MOV") == 0 && strcmp(check->result, current->result) == 0) {
-                    isRedundant = 1;
-                    break;
-                }
-                check = check->next;
-            }
-
-            if (isRedundant) {
-                // Remove the current TAC from the list
-                if (prev == NULL) {
-                    *head = next; // Update head if we're removing the first element
-                } else {
-                    prev->next = next; // Link previous node to the next one
-                }
-                free(current->result);
-                free(current->operand1);
-                free(current->operand2);
-                free(current);
-                current = next;
-                continue;
-            }
-        }
-
-        prev = current;
-        current = next;
+// Function to check if a string is a constant integer
+bool isConstant(const char* str) {
+    if (str == NULL || *str == '\0') return false;
+    if (*str == '-') ++str;  // Handle negative constants
+    while (*str) {
+        if (!isdigit((unsigned char)*str)) return false;
+        ++str;
     }
+    return true;
 }
 
-int isConstant(const char* operand) {
-    if (operand == NULL) return 0;
-    for (int i = 0; operand[i] != '\0'; i++) {
-        if (!isdigit(operand[i])) return 0;
+// Create a temporary variable for TAC results
+char* createTempVar() {
+    static int tempCounter = 0;
+    char* tempVar = (char*)malloc(10);
+    snprintf(tempVar, 10, "t%d", tempCounter++);
+    return tempVar;
+}
+
+// Function to safely append a TAC node to the list
+void appendTAC(TAC** head, TAC* newInstruction) {
+    if (!newInstruction) return; // Prevent appending a NULL instruction
+    if (!*head) {
+        *head = newInstruction;
+    } else {
+        TAC* current = *head;
+        while (current->next) {
+            current = current->next;
+        }
+        current->next = newInstruction;
     }
-    return 1;
 }

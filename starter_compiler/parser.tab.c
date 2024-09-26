@@ -1550,12 +1550,15 @@ int main() {
 		printf("\n----- GENERATED TAC (BEFORE OPTIMIZATION) -----\n");
 		printTAC();
 
-		// Optimize the TAC
-		optimizeTAC();
+		// Step 1: Clean the TAC by replacing variable references with temp vars
+        replaceVariablesWithTemp(&tacHead);
 
-		// Print the optimized TAC
-		printf("\n----- OPTIMIZED TAC -----\n");
-		printTAC();
+        // Step 2: Optimize the cleaned-up TAC
+        // optimizeTAC(&tacHead);
+
+        // Print the optimized TAC
+        printf("\n----- OPTIMIZED TAC -----\n");
+        printTAC();
 
 		// Generate MIPS code from the TAC
         // printf("\n----- GENERATED MIPS CODE -----\n");

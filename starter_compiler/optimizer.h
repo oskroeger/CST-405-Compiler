@@ -5,13 +5,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
-
-void constantFolding(TAC* tac);
-void copyPropagation(TAC* tac);
-int isConstant(const char* operand);
-void optimizeTAC();
-void removeUnusedTemporaries(TAC** head);
-void eliminateRedundantAssignments(TAC** head);
+TAC* createTAC(const char* operation, const char* result, const char* operand1, const char* operand2);
+void replaceVariablesWithTemp(TAC** head);
+char* simplifyExpression(TAC* head, const char* operand, TAC** simplifiedHead);
+void optimizeTAC(TAC** head);
+bool isVariable(const char* str);
+bool isTemp(const char* str);
+bool isConstant(const char* str);
+char* createTempVar();
+void appendTAC(TAC** head, TAC* newInstruction);
 
 #endif // OPTIMIZER_H
