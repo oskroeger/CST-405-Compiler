@@ -8,9 +8,12 @@
 #include <stdbool.h>
 
 TAC* createTAC(const char* operation, const char* result, const char* operand1, const char* operand2);
-void replaceVariablesWithTemp(TAC** head);
-char* simplifyExpression(TAC* head, const char* operand, TAC** simplifiedHead);
 void optimizeTAC(TAC** head);
+void constantFolding(TAC** head, TAC** optimizedHead);
+void copyPropagation(TAC** head, TAC** optimizedHead);
+void deadCodeElimination(TAC** head, TAC** optimizedHead);
+void renumberRegisters(TAC** head);
+void replaceVariablesWithTemp(TAC** head);
 bool isVariable(const char* str);
 bool isTemp(const char* str);
 bool isConstant(const char* str);

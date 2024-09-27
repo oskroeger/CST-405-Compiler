@@ -9,7 +9,6 @@
 
 void generateMIPS(TAC* tacHead) {
     TAC* current = tacHead;
-    printf("\n----- GENERATED MIPS CODE -----\n");
 
     while (current != NULL) {
         if (strcmp(current->operation, "MOV") == 0) {
