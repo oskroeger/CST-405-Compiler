@@ -48,7 +48,7 @@ void generateMIPS(TAC* tacHead) {
 
     // Write exit syscall
     fprintf(file, "    li $v0, 10\n");
-    fprintf(file, "    syscall\n");
+    fprintf(file, "    syscall");
 
     fclose(file);
     printf("MIPS code written to output.s\n");

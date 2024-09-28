@@ -63,7 +63,20 @@ void generateTAC(const char* operation, const char* result, const char* operand1
 
 
 void printTAC() {
+    static int tacWrittenToFile = 0;  // Static flag to track if the TAC has already been written to the file
     TAC* current = tacHead;
+    FILE* tacFile = NULL;
+
+    // Only open the file and write if it's the first time this function is called
+    if (!tacWrittenToFile) {
+        tacFile = fopen("TAC.ir", "w");  // Open the file for writing
+        if (tacFile == NULL) {
+            fprintf(stderr, "Error: Could not open TAC.ir for writing.\n");
+            return;
+        }
+        tacWrittenToFile = 1;  // Set the flag to prevent further file writes
+    }
+
     while (current != NULL) {
         // Ensure that each part of the TAC is checked for NULL to prevent crashes.
         const char* result = current->result ? current->result : "";
@@ -73,19 +86,67 @@ void printTAC() {
 
         // Print format depending on operation type.
         if (strcmp(operation, "MOV") == 0) {
-            // MOV operations usually have one operand.
             printf("%s = %s %s\n", result, operation, operand1);
+            if (tacFile) fprintf(tacFile, "%s = %s %s\n", result, operation, operand1);
         } else if (strlen(operand2) > 0) {
-            // Print format for binary operations (e.g., ADD, SUB).
             printf("%s = %s %s %s\n", result, operand1, operation, operand2);
+            if (tacFile) fprintf(tacFile, "%s = %s %s %s\n", result, operand1, operation, operand2);
         } else {
-            // Print format for unary operations (or other types with one operand).
             printf("%s = %s %s\n", result, operation, operand1);
+            if (tacFile) fprintf(tacFile, "%s = %s %s\n", result, operation, operand1);
         }
 
         current = current->next;
     }
+
+    if (tacFile) {
+        fclose(tacFile);  // Close the file after writing
+    }
 }
+
+
+void printOptimizedTAC() {
+    static int optimizedTACWrittenToFile = 0;  // Static flag to track if the optimized TAC has been written to the file
+    TAC* current = tacHead; // Assuming tacHead points to the optimized TAC after optimization
+    FILE* tacFile = NULL;
+
+    // Only open the file and write if it's the first time this function is called
+    if (!optimizedTACWrittenToFile) {
+        tacFile = fopen("TACOptimized.ir", "w");  // Open the file for writing
+        if (tacFile == NULL) {
+            fprintf(stderr, "Error: Could not open TACOptimized.ir for writing.\n");
+            return;
+        }
+        optimizedTACWrittenToFile = 1;  // Set the flag to prevent further file writes
+    }
+
+    while (current != NULL) {
+        // Ensure that each part of the TAC is checked for NULL to prevent crashes.
+        const char* result = current->result ? current->result : "";
+        const char* operand1 = current->operand1 ? current->operand1 : "";
+        const char* operation = current->operation ? current->operation : "";
+        const char* operand2 = current->operand2 ? current->operand2 : "";
+
+        // Print format depending on operation type.
+        if (strcmp(operation, "MOV") == 0) {
+            printf("%s = %s %s\n", result, operation, operand1);
+            if (tacFile) fprintf(tacFile, "%s = %s %s\n", result, operation, operand1);
+        } else if (strlen(operand2) > 0) {
+            printf("%s = %s %s %s\n", result, operand1, operation, operand2);
+            if (tacFile) fprintf(tacFile, "%s = %s %s %s\n", result, operand1, operation, operand2);
+        } else {
+            printf("%s = %s %s\n", result, operation, operand1);
+            if (tacFile) fprintf(tacFile, "%s = %s %s\n", result, operation, operand1);
+        }
+
+        current = current->next;
+    }
+
+    if (tacFile) {
+        fclose(tacFile);  // Close the file after writing
+    }
+}
+
 
 
 

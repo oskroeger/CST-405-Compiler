@@ -121,7 +121,7 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
             copyMap[index] = strdup(current->operand1);
 
             // Debugging output to show the copy propagation mapping
-            printf("Propagating copy: %s now holds value of %s\n", current->result, current->operand1);
+            // printf("Propagating copy: %s now holds value of %s\n", current->result, current->operand1);
         } else {
             // Replace operands with their propagated values if they exist
             char* operand1 = current->operand1;
@@ -147,7 +147,7 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
             appendTAC(optimizedHead, newTAC);
 
             // Debugging output to show the TAC after propagation
-            printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
+            // printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
         }
         current = current->next;
     }
@@ -187,13 +187,13 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
                 // Append only if the register is marked as used
                 TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
                 appendTAC(optimizedHead, newTAC);
-                printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
+                // printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
             }
         } else {
             // Append other operations
             TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
             appendTAC(optimizedHead, newTAC);
-            printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
+            // printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
         }
         current = current->next;
     }
@@ -206,7 +206,7 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
         }
         TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
         appendTAC(optimizedHead, newTAC);
-        printf("Appended Last TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
+        // printf("Appended Last TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
     }
 
     // Print final TAC after dead code elimination
@@ -241,7 +241,7 @@ void renumberRegisters(TAC** head) {
             if (!registerMap[index]) {
                 sprintf(newResult, "t%d", regCounter);
                 registerMap[index] = strdup(newResult);
-                printf("Mapping %s -> %s\n", current->result, newResult);  // Debug print
+                // printf("Mapping %s -> %s\n", current->result, newResult);  // Debug print
                 regCounter++;
             } else {
                 strcpy(newResult, registerMap[index]);
@@ -288,7 +288,7 @@ void renumberRegisters(TAC** head) {
                 // Apply the direct mapping from the register map without the redundant reference
                 strcpy(current->result, registerMap[writeRegIndex]);
                 current->operand1 = NULL;  // Remove redundant operand reference
-                printf("Correct WRITE mapping to: %s\n", current->result);  // Debug print
+                // printf("Correct WRITE mapping to: %s\n", current->result);  // Debug print
             }
         }
         current = current->next;

@@ -19,6 +19,7 @@ extern TAC* tacTail;  // Tail of the TAC linked list
 
 void generateTAC(const char* operation, const char* result, const char* operand1, const char* operand2);
 void printTAC();
+void printOptimizedTAC();
 char* generateTempVar();
 char* generateExprTAC(ASTNode* expr, SymbolTable* symTab);
 void semanticCheck(ASTNode* node, SymbolTable* symTab);

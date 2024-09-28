@@ -9,7 +9,7 @@
 
 int words = 0;
 int chars = 0;
-int lines = 0;
+int lines = 1; // Start line counting from 1
 
 %}
 
@@ -22,65 +22,81 @@ ws          {delim}+
 
 %option yylineno
 %%
-"/*"    				{
-							int c;
-							while((c = input()) != 0) {
-								if(c == '*') {
-									if((c = input()) == '/')
-										break;
-									else
-										unput(c);
-								}
-							}
-						}
-						
-"int"	{words++; chars += strlen(yytext);
-			printf("%s : TYPE\n", yytext);
-			yylval.string = strdup(yytext); 
-			return TYPE;
-		}
+"/*" {
+        int c;
+        while ((c = input()) != 0) {
+            if (c == '*') {
+                if ((c = input()) == '/')
+                    break;
+                else
+                    unput(c);
+            }
+        }
+    }
 
-"write"	{words++; chars += strlen(yytext);
-			printf("%s : KEYWORD\n", yytext);
-			yylval.string = strdup(yytext); 
-			return WRITE;
-		}
+"int" {
+        words++;
+        chars += strlen(yytext);
+        printf("%s : TYPE\n", yytext);
+        yylval.string = strdup(yytext);
+        return TYPE;
+    }
 
-{ID}	{words++; chars += strlen(yytext);
-			  printf("%s : IDENTIFIER\n",yytext);
-			  yylval.string = strdup(yytext); 
-			  return ID;
-			}
-			
-{NUMBER}		{words++; chars += strlen(yytext);
-			  printf("%s : NUMBER\n",yytext);
-			  yylval.number = atoi(strdup(yytext)); 
-			  return NUMBER;
-			}
-			
-";"		{chars++;
-		  printf("%s : SEMICOLON\n", yytext);
-		  yylval.string = strdup(yytext); 
-		  return SEMICOLON;
-		}
-		
-"="		{chars++;
-		  printf("%s : EQ\n", yytext);
-		  yylval.operator = strdup(yytext); 
-		  return EQ;
-		}
+"write" {
+        words++;
+        chars += strlen(yytext);
+        printf("%s : KEYWORD\n", yytext);
+        yylval.string = strdup(yytext);
+        return WRITE;
+    }
 
-"+"		{chars++;
-		  printf("%s : PLUS\n", yytext);
-		  yylval.operator = strdup(yytext); 
-		  return PLUS;
-		}
-		
-[\n]	{lines++; chars=0;yylineno++;}
-[ \t]	{chars++;}
-.		{chars++;
-         printf("%s : Unrecognized symbol at line %d char %d\n", yytext,lines,chars);
-		}
-		
+{ID} {
+        words++;
+        chars += strlen(yytext);
+        printf("%s : IDENTIFIER\n", yytext);
+        yylval.string = strdup(yytext);
+        return ID;
+    }
+
+{NUMBER} {
+        words++;
+        chars += strlen(yytext);
+        printf("%s : NUMBER\n", yytext);
+        yylval.number = atoi(strdup(yytext));
+        return NUMBER;
+    }
+
+";" {
+        chars++;
+        printf("%s : SEMICOLON\n", yytext);
+        yylval.string = strdup(yytext);
+        return SEMICOLON;
+    }
+
+"=" {
+        chars++;
+        printf("%s : EQ\n", yytext);
+        yylval.operator = strdup(yytext);
+        return EQ;
+    }
+
+"+" {
+        chars++;
+        printf("%s : PLUS\n", yytext);
+        yylval.operator = strdup(yytext);
+        return PLUS;
+    }
+
+\n {
+        lines++; 
+        chars = 0; 
+    }
+
+[ \t] { chars++; }
+
+. {
+        chars++;
+        printf("%s : Unrecognized symbol at line %d char %d\n", yytext, lines, chars);
+    }
 
 %%

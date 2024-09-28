@@ -188,22 +188,31 @@ ASTNode* createNode(NodeType type) {
 
 int evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
     if (expr->type == NodeType_SimpleExpr) {
+        // If the node is a simple expression with a number, return the number
         return expr->simpleExpr.number;
     } else if (expr->type == NodeType_SimpleID) {
+        // Look up the symbol to ensure it has been declared
         Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
         if (sym != NULL) {
+            // Check if the variable has been initialized (not INT_MIN)
+            if (sym->intValue == INT_MIN) {
+                fprintf(stderr, "Error: Variable '%s' used before being defined.\n", expr->simpleID.name);
+                exit(EXIT_FAILURE);
+            }
             return sym->intValue;
         } else {
-            fprintf(stderr, "Error: Variable %s used before declaration.\n", expr->simpleID.name);
+            fprintf(stderr, "Error: Variable '%s' used before declaration.\n", expr->simpleID.name);
             exit(EXIT_FAILURE);
         }
     } else if (expr->type == NodeType_Expr) {
+        // Recursively evaluate left and right sides of the expression
         int leftVal = evaluateExpr(expr->expr.left, symTab);
         int rightVal = evaluateExpr(expr->expr.right, symTab);
+        // Handle the "+" operator and other operators as needed
         if (strcmp(expr->expr.operator, "+") == 0) {
             return leftVal + rightVal;
         }
-        // Handle other operators (e.g., -, *, /) as needed
+        // Add more operator handling here if needed (e.g., -, *, /)
     }
     return 0; // Default return value if evaluation fails
 }

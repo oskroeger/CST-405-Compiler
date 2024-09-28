@@ -1,6 +1,9 @@
-int x;
-int y;
-x = 5;
-y = x + 3 + 4;
-write x;
-write y;
+int a;
+int b;
+int c;
+a = 4;
+b = a + 3;
+c = a + a + b + 5;
+write a;
+write b;
+write c;
