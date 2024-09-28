@@ -1,9 +1,6 @@
 int x;
 int y;
-int z;
-x = 4 + 3;
-y = x + 2;
-z = x + y + 5;
+x = 5;
+y = x + 3 + 4;
 write x;
 write y;
-write z;

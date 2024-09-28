@@ -7,24 +7,49 @@
 #include <stdbool.h>
 
 
+// Function to generate MIPS code and write it to an output file
 void generateMIPS(TAC* tacHead) {
+    FILE* file = fopen("output.s", "w");
+    if (!file) {
+        perror("Failed to open output file");
+        exit(EXIT_FAILURE);
+    }
+
+    // Write headers to the file
+    fprintf(file, ".data\n");
+    fprintf(file, "newline: .asciiz \"\\n\"\n");
+    fprintf(file, ".text\n");
+    fprintf(file, ".globl main\n");
+    fprintf(file, "main:\n");
+
     TAC* current = tacHead;
 
+    // Write MIPS instructions based on TAC
     while (current != NULL) {
         if (strcmp(current->operation, "MOV") == 0) {
             if (isConstant(current->operand1)) {
-                printf("li $%s, %s\n", current->result, current->operand1); // Load immediate value into the register
+                fprintf(file, "    li $%s, %s\n", current->result, current->operand1); // Load immediate value into the register
             } else {
-                printf("move $%s, $%s\n", current->result, current->operand1); // Move value between registers
+                fprintf(file, "    move $%s, $%s\n", current->result, current->operand1); // Move value between registers
             }
         } else if (strcmp(current->operation, "ADD") == 0) {
-            printf("add $%s, $%s, $%s\n", current->result, current->operand1, current->operand2); // Add operation between registers
+            fprintf(file, "    add $%s, $%s, $%s\n", current->result, current->operand1, current->operand2); // Add operation between registers
         } else if (strcmp(current->operation, "WRITE") == 0) {
             // MIPS syscall to print integer
-            printf("move $a0, $%s\n", current->result); // Move value from the specified register to $a0 for printing
-            printf("li $v0, 1\n"); // Load syscall code for print integer
-            printf("syscall\n"); // Execute syscall
+            fprintf(file, "    move $a0, $%s\n", current->result); // Move value from the specified register to $a0 for printing
+            fprintf(file, "    li $v0, 1\n"); // Load syscall code for print integer
+            fprintf(file, "    syscall\n"); // Execute syscall
+            fprintf(file, "    li $v0, 4\n"); // Load syscall code for print string
+            fprintf(file, "    la $a0, newline\n"); // Load the address of the newline string into $a0
+            fprintf(file, "    syscall\n"); // Execute syscall
         }
         current = current->next;
     }
+
+    // Write exit syscall
+    fprintf(file, "    li $v0, 10\n");
+    fprintf(file, "    syscall\n");
+
+    fclose(file);
+    printf("MIPS code written to output.s\n");
 }

@@ -166,12 +166,14 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
 void deadCodeElimination(TAC** head, TAC** optimizedHead) {
     TAC* current = *head;
     int usedRegs[100] = {0};  // Track used registers
+    int hasWrites = 0;        // Flag to check if there are any WRITE statements
 
     // First pass: mark registers used in WRITE operations
     while (current != NULL) {
         if (strcmp(current->operation, "WRITE") == 0 && current->result) {
             int regIndex = atoi(&current->result[1]);
             usedRegs[regIndex] = 1;  // Mark the register as used
+            hasWrites = 1;           // Mark that we have WRITE operations
         }
         current = current->next;
     }
@@ -196,6 +198,17 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
         current = current->next;
     }
 
+    // If no WRITE statements were found and the optimized TAC is empty, append the last instruction
+    if (!hasWrites && *optimizedHead == NULL && *head != NULL) {
+        current = *head;
+        while (current->next != NULL) {
+            current = current->next;
+        }
+        TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
+        appendTAC(optimizedHead, newTAC);
+        printf("Appended Last TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
+    }
+
     // Print final TAC after dead code elimination
     printf("\n----- TAC After Dead Code Elimination -----\n");
     TAC* temp = *optimizedHead;
@@ -205,68 +218,56 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
     }
 }
 
+
 // Helper function to renumber registers while preserving WRITE references
 void renumberRegisters(TAC** head) {
     TAC* current = *head;
     TAC* newHead = NULL;
     TAC* newTail = NULL;
 
-    // Map to track old registers to new register numbers without allowing cascades
-    char* registerMap[100] = {NULL}; // Adjust size as needed
+    // Map to track old registers to new register numbers
+    char* registerMap[100] = {NULL};  // Adjust size as needed
     int regCounter = 0;
 
-    // Traverse the TAC list and create a new renumbered TAC
+    // First Pass: Renumber MOV operations, ignoring WRITE
     while (current != NULL) {
         char newResult[10] = "";
         char newOperand1[10] = "";
         char newOperand2[10] = "";
 
-        // Renumber result register and update the map without chaining
-        if (isTemp(current->result)) {
+        // Renumber result register and update the map
+        if (strcmp(current->operation, "MOV") == 0 && isTemp(current->result)) {
             int index = atoi(&current->result[1]);
             if (!registerMap[index]) {
                 sprintf(newResult, "t%d", regCounter);
                 registerMap[index] = strdup(newResult);
-                printf("Mapping %s -> %s\n", current->result, newResult); // Debug print
+                printf("Mapping %s -> %s\n", current->result, newResult);  // Debug print
                 regCounter++;
             } else {
                 strcpy(newResult, registerMap[index]);
-                printf("Using existing mapping for %s -> %s\n", current->result, newResult); // Debug print
             }
         } else {
             strcpy(newResult, current->result ? current->result : "");
         }
 
-        // Renumber operand1 register if it exists in the map, without chaining backward
+        // Renumber operand1 register if it exists in the map
         if (current->operand1 && isTemp(current->operand1)) {
             int oldIndex = atoi(&current->operand1[1]);
-            if (registerMap[oldIndex]) {
-                strcpy(newOperand1, registerMap[oldIndex]);
-            } else {
-                strcpy(newOperand1, current->operand1);
-            }
-            printf("Operand1 mapping: %s -> %s\n", current->operand1, newOperand1); // Debug print
+            strcpy(newOperand1, registerMap[oldIndex] ? registerMap[oldIndex] : current->operand1);
         } else {
             strcpy(newOperand1, current->operand1 ? current->operand1 : "");
         }
 
-        // Renumber operand2 register if it exists in the map, without chaining backward
+        // Renumber operand2 register if it exists in the map
         if (current->operand2 && isTemp(current->operand2)) {
             int oldIndex = atoi(&current->operand2[1]);
-            if (registerMap[oldIndex]) {
-                strcpy(newOperand2, registerMap[oldIndex]);
-            } else {
-                strcpy(newOperand2, current->operand2);
-            }
-            printf("Operand2 mapping: %s -> %s\n", current->operand2, newOperand2); // Debug print
+            strcpy(newOperand2, registerMap[oldIndex] ? registerMap[oldIndex] : current->operand2);
         } else {
             strcpy(newOperand2, current->operand2 ? current->operand2 : "");
         }
 
-        // Create a new TAC with renumbered registers
+        // Create the new TAC and append it to the new list
         TAC* newTAC = createTAC(current->operation, newResult, newOperand1, newOperand2);
-
-        // Append the new TAC to the renumbered list
         if (newHead == NULL) {
             newHead = newTAC;
             newTail = newTAC;
@@ -278,15 +279,16 @@ void renumberRegisters(TAC** head) {
         current = current->next;
     }
 
-    // Second pass: Correct WRITE instructions to ensure direct reference mapping
+    // Second Pass: Update WRITE instructions to ensure direct mapping and clean references
     current = newHead;
     while (current != NULL) {
         if (strcmp(current->operation, "WRITE") == 0 && isTemp(current->result)) {
             int writeRegIndex = atoi(&current->result[1]);
             if (registerMap[writeRegIndex]) {
-                // Apply the direct mapping from the register map
+                // Apply the direct mapping from the register map without the redundant reference
                 strcpy(current->result, registerMap[writeRegIndex]);
-                printf("Final WRITE update: %s -> %s\n", current->result, registerMap[writeRegIndex]); // Debug print
+                current->operand1 = NULL;  // Remove redundant operand reference
+                printf("Correct WRITE mapping to: %s\n", current->result);  // Debug print
             }
         }
         current = current->next;
@@ -295,7 +297,7 @@ void renumberRegisters(TAC** head) {
     // Update the original head to point to the renumbered TAC list
     *head = newHead;
 
-    // Free memory for registerMap entries to prevent memory leaks
+    // Clean up memory used by registerMap
     for (int i = 0; i < 100; i++) {
         if (registerMap[i]) {
             free(registerMap[i]);
