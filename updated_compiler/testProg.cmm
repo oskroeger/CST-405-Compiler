@@ -1,0 +1,6 @@
+int a;
+int b;
+a = 6 * 4;
+b = (a + 1) / (20 + 5);
+write a;
+write b;

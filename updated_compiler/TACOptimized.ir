@@ -1,0 +1,8 @@
+t0 = MOV 3
+t1 = MOV 7
+t2 = MOV 17
+t3 = MOV 44
+t0 = WRITE 
+t1 = WRITE 
+t2 = WRITE 
+t3 = WRITE 
