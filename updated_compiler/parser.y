@@ -317,23 +317,23 @@ int main() {
 
         // After TAC generation
         printf("\n----- GENERATED TAC (BEFORE OPTIMIZATION) -----\n");
-        // printTAC();
+        printTAC();
 
         // Step 1: Clean the TAC by replacing variable references with temp vars
         printf("\n----- CLEANED TAC -----\n");
-        // replaceVariablesWithTemp(&tacHead);
-        // printTAC();
+        replaceVariablesWithTemp(&tacHead);
+        printTAC();
 
         // Step 2: Optimize the cleaned-up TAC
-        // optimizeTAC(&tacHead);
+        optimizeTAC(&tacHead);
 
         // Print the optimized TAC
         printf("\n----- OPTIMIZED TAC -----\n");
-		// printOptimizedTAC();
+		printOptimizedTAC();
 
         // Generate MIPS code from the TAC
         printf("\n----- GENERATED MIPS CODE -----\n");
-        // generateMIPS(tacHead);
+        generateMIPS(tacHead);
 
         // Clean up the AST
         if (root != NULL) {

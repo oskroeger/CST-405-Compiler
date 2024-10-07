@@ -14,12 +14,14 @@ char* generateTempVar() {
 
 char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
     if (expr->type == NodeType_SimpleExpr) {
+        // Handle simple expressions (constants)
         char* tempVar = generateTempVar();
         char valueStr[20];
         sprintf(valueStr, "%d", expr->simpleExpr.number);
-        generateTAC("MOV", tempVar, valueStr, NULL);  // Correct order
+        generateTAC("MOV", tempVar, valueStr, NULL);  // Move constant into temp variable
         return tempVar;
     } else if (expr->type == NodeType_SimpleID) {
+        // Handle variable references
         Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
         if (sym != NULL) {
             return sym->name;  // Return the variable name directly
@@ -28,15 +30,26 @@ char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
             exit(EXIT_FAILURE);
         }
     } else if (expr->type == NodeType_Expr) {
+        // Recursively generate TAC for left and right sub-expressions
         char* leftVar = generateExprTAC(expr->expr.left, symTab);
         char* rightVar = generateExprTAC(expr->expr.right, symTab);
         char* tempVar = generateTempVar();
 
+        // Handle the different operators
         if (strcmp(expr->expr.operator, "+") == 0) {
-            generateTAC("ADD", tempVar, leftVar, rightVar);  // Correct order
-            return tempVar;
+            generateTAC("ADD", tempVar, leftVar, rightVar);
+        } else if (strcmp(expr->expr.operator, "-") == 0) {
+            generateTAC("SUB", tempVar, leftVar, rightVar);
+        } else if (strcmp(expr->expr.operator, "*") == 0) {
+            generateTAC("MUL", tempVar, leftVar, rightVar);
+        } else if (strcmp(expr->expr.operator, "/") == 0) {
+            // Add division by zero check if needed
+            generateTAC("DIV", tempVar, leftVar, rightVar);
+        } else {
+            fprintf(stderr, "Error: Unsupported operator '%s'.\n", expr->expr.operator);
+            exit(EXIT_FAILURE);
         }
-        // Handle other operators (e.g., -, *, /) as needed
+        return tempVar;
     }
     return NULL; // Default return value if TAC generation fails
 }

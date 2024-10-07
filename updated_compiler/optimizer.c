@@ -61,7 +61,9 @@ void constantFolding(TAC** head, TAC** optimizedHead) {
         }
 
         // Fold arithmetic operations with constants
-        if (strcmp(current->operation, "ADD") == 0) {
+        if (strcmp(current->operation, "ADD") == 0 || strcmp(current->operation, "SUB") == 0 ||
+            strcmp(current->operation, "MUL") == 0 || strcmp(current->operation, "DIV") == 0) {
+
             // Check if operands are temp registers holding constants
             int leftIndex = (current->operand1 && current->operand1[0] == 't') ? atoi(&current->operand1[1]) : -1;
             int rightIndex = (current->operand2 && current->operand2[0] == 't') ? atoi(&current->operand2[1]) : -1;
@@ -70,7 +72,21 @@ void constantFolding(TAC** head, TAC** optimizedHead) {
             if (leftIndex != -1 && rightIndex != -1 && constantMap[leftIndex] && constantMap[rightIndex]) {
                 int leftValue = atoi(constantMap[leftIndex]);
                 int rightValue = atoi(constantMap[rightIndex]);
-                int result = leftValue + rightValue;
+                int result = 0;
+
+                // Handle each operation
+                if (strcmp(current->operation, "ADD") == 0) {
+                    result = leftValue + rightValue;
+                } else if (strcmp(current->operation, "SUB") == 0) {
+                    result = leftValue - rightValue;
+                } else if (strcmp(current->operation, "MUL") == 0) {
+                    result = leftValue * rightValue;
+                } else if (strcmp(current->operation, "DIV") == 0 && rightValue != 0) {
+                    result = leftValue / rightValue;
+                } else if (strcmp(current->operation, "DIV") == 0 && rightValue == 0) {
+                    fprintf(stderr, "Error: Division by zero.\n");
+                    exit(EXIT_FAILURE);
+                }
 
                 // Convert the result back to a string and create a new MOV TAC
                 char resultStr[20];
@@ -87,7 +103,7 @@ void constantFolding(TAC** head, TAC** optimizedHead) {
                 appendTAC(optimizedHead, newTAC);
             }
         } else {
-            // Append non-ADD operations without modification
+            // Append non-arithmetic operations without modification
             TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
             appendTAC(optimizedHead, newTAC);
         }
@@ -107,7 +123,6 @@ void constantFolding(TAC** head, TAC** optimizedHead) {
     }
 }
 
-
 // Function to propagate copies and eliminate unnecessary MOVs
 void copyPropagation(TAC** head, TAC** optimizedHead) {
     TAC* current = *head;
@@ -120,8 +135,11 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
             int index = atoi(&current->result[1]);
             copyMap[index] = strdup(current->operand1);
 
-            // Debugging output to show the copy propagation mapping
-            // printf("Propagating copy: %s now holds value of %s\n", current->result, current->operand1);
+        } else if (strcmp(current->operation, "WRITE") == 0) {
+            // Do NOT propagate copies into WRITE operations, use the original temp
+            TAC* newTAC = createTAC(current->operation, current->result, NULL, NULL);
+            appendTAC(optimizedHead, newTAC);
+
         } else {
             // Replace operands with their propagated values if they exist
             char* operand1 = current->operand1;
@@ -130,6 +148,7 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
             int leftIndex = (operand1 && operand1[0] == 't') ? atoi(&operand1[1]) : -1;
             int rightIndex = (operand2 && operand2[0] == 't') ? atoi(&operand2[1]) : -1;
 
+            // If the temp has been mapped, replace it with the value from copyMap
             if (leftIndex != -1 && copyMap[leftIndex]) {
                 operand1 = copyMap[leftIndex];
             }
@@ -137,18 +156,11 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
                 operand2 = copyMap[rightIndex];
             }
 
-            // Special handling for WRITE operations
-            if (strcmp(current->operation, "WRITE") == 0) {
-                operand1 = current->result;  // Use the result directly for WRITE operations
-            }
-
             // Create a new TAC with updated values
             TAC* newTAC = createTAC(current->operation, current->result, operand1, operand2);
             appendTAC(optimizedHead, newTAC);
-
-            // Debugging output to show the TAC after propagation
-            // printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
         }
+
         current = current->next;
     }
 
@@ -156,7 +168,10 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
     printf("\n----- TAC After Copy Propagation -----\n");
     TAC* temp = *optimizedHead;
     while (temp != NULL) {
-        printf("%s = %s %s %s\n", temp->result, temp->operand1, temp->operation, temp->operand2 ? temp->operand2 : "");
+        printf("%s = %s %s %s\n", temp->result, 
+               temp->operand1 ? temp->operand1 : "", 
+               temp->operation, 
+               temp->operand2 ? temp->operand2 : "");
         temp = temp->next;
     }
 }
@@ -168,17 +183,30 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
     int usedRegs[100] = {0};  // Track used registers
     int hasWrites = 0;        // Flag to check if there are any WRITE statements
 
-    // First pass: mark registers used in WRITE operations
+    // First pass: mark registers used in WRITE operations and binary operations
     while (current != NULL) {
         if (strcmp(current->operation, "WRITE") == 0 && current->result) {
-            int regIndex = atoi(&current->result[1]);
-            usedRegs[regIndex] = 1;  // Mark the register as used
+            // Mark the register or variable used in the WRITE operation
+            if (current->result[0] == 't') {
+                int regIndex = atoi(&current->result[1]);
+                usedRegs[regIndex] = 1;  // Mark the temp register as used
+            }
             hasWrites = 1;           // Mark that we have WRITE operations
+        } else if (isBinaryOperation(current->operation)) {
+            // For binary operations (ADD, SUB, etc.), mark both operands as used
+            if (current->operand1 && current->operand1[0] == 't') {
+                int regIndex = atoi(&current->operand1[1]);
+                usedRegs[regIndex] = 1;
+            }
+            if (current->operand2 && current->operand2[0] == 't') {
+                int regIndex = atoi(&current->operand2[1]);
+                usedRegs[regIndex] = 1;
+            }
         }
         current = current->next;
     }
 
-    // Second pass: copy only necessary instructions
+    // Second pass: copy only necessary instructions, preserving WRITE operations
     current = *head;
     while (current != NULL) {
         if (strcmp(current->operation, "MOV") == 0 && isTemp(current->result)) {
@@ -187,13 +215,24 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
                 // Append only if the register is marked as used
                 TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
                 appendTAC(optimizedHead, newTAC);
-                // printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
             }
+        } else if (isBinaryOperation(current->operation)) {
+            // For binary operations, append the instruction if any operand is marked as used
+            int leftReg = (current->operand1 && current->operand1[0] == 't') ? atoi(&current->operand1[1]) : -1;
+            int rightReg = (current->operand2 && current->operand2[0] == 't') ? atoi(&current->operand2[1]) : -1;
+
+            if ((leftReg != -1 && usedRegs[leftReg]) || (rightReg != -1 && usedRegs[rightReg])) {
+                TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
+                appendTAC(optimizedHead, newTAC);
+            }
+        } else if (strcmp(current->operation, "WRITE") == 0) {
+            // Ensure the WRITE operation retains its correct reference
+            TAC* newTAC = createTAC(current->operation, current->result, current->result, NULL);
+            appendTAC(optimizedHead, newTAC);
         } else {
-            // Append other operations
+            // Append other operations (including WRITE)
             TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
             appendTAC(optimizedHead, newTAC);
-            // printf("Appended TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
         }
         current = current->next;
     }
@@ -206,7 +245,6 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
         }
         TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2);
         appendTAC(optimizedHead, newTAC);
-        // printf("Appended Last TAC: %s = %s %s %s\n", newTAC->result, newTAC->operand1, newTAC->operation, newTAC->operand2 ? newTAC->operand2 : "");
     }
 
     // Print final TAC after dead code elimination
@@ -218,6 +256,13 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
     }
 }
 
+
+
+// Helper function to check if an operation is a binary arithmetic operation
+bool isBinaryOperation(const char* operation) {
+    return (strcmp(operation, "ADD") == 0 || strcmp(operation, "SUB") == 0 ||
+            strcmp(operation, "MUL") == 0 || strcmp(operation, "DIV") == 0);
+}
 
 // Helper function to renumber registers while preserving WRITE references
 void renumberRegisters(TAC** head) {
@@ -313,33 +358,42 @@ void replaceVariablesWithTemp(TAC** head) {
     TAC* cleanedHead = NULL;
     TAC* cleanedTail = NULL;
 
-    // Dictionary to map variables to their corresponding temp vars
+    // Dictionary to map variables to their corresponding temp vars or other variables
     char* variableMap[100][2]; // Adjust size as needed
     int mapIndex = 0;
 
     while (current != NULL) {
-        // Handle MOV operations involving variables
-        if (strcmp(current->operation, "MOV") == 0 && isVariable(current->result) && isTemp(current->operand1)) {
-            // Update the mapping of the variable to its corresponding temp var
+        // Handle MOV operations involving variables or variable-to-variable assignments
+        if (strcmp(current->operation, "MOV") == 0 && (isVariable(current->result) && (isTemp(current->operand1) || isVariable(current->operand1)))) {
+            // If the operand is a variable, resolve it to its temp register or mapped variable
+            char* finalOperand = current->operand1;
+            for (int i = 0; i < mapIndex; i++) {
+                if (strcmp(finalOperand, variableMap[i][0]) == 0) {
+                    finalOperand = variableMap[i][1];  // Resolve to the mapped value
+                    break;
+                }
+            }
+
+            // Update the mapping of the variable to its corresponding temp var or resolved variable
             int found = 0;
             for (int i = 0; i < mapIndex; i++) {
                 if (strcmp(variableMap[i][0], current->result) == 0) {
                     free(variableMap[i][1]);
-                    variableMap[i][1] = strdup(current->operand1);
+                    variableMap[i][1] = strdup(finalOperand);
                     found = 1;
                     break;
                 }
             }
             if (!found) {
                 variableMap[mapIndex][0] = strdup(current->result);   // Variable name
-                variableMap[mapIndex][1] = strdup(current->operand1); // Corresponding temp var
+                variableMap[mapIndex][1] = strdup(finalOperand); // Corresponding temp var or resolved variable
                 mapIndex++;
             }
             current = current->next;
             continue;
         }
 
-        // Replace variable references in operands with corresponding temp vars
+        // Replace variable references in operands with corresponding temp vars or resolved variables
         char* operand1 = current->operand1;
         char* operand2 = current->operand2;
         for (int i = 0; i < mapIndex; i++) {
@@ -379,6 +433,7 @@ void replaceVariablesWithTemp(TAC** head) {
     // Update the original head to point to the cleaned TAC list
     *head = cleanedHead;
 }
+
 
 // Function to check if a string is a valid variable name
 bool isVariable(const char* str) {

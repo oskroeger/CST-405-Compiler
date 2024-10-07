@@ -1,6 +1,9 @@
-int a;
-int b;
-a = 6 * 4;
-b = (a + 1) / (20 + 5);
-write a;
-write b;
+int x;
+int y;
+int z;
+x = (5 + 2) * 3;
+y = x - 4;
+z = y * (x + y);
+write x;
+write y;
+write z;

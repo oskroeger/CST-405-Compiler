@@ -12,6 +12,7 @@ void optimizeTAC(TAC** head);
 void constantFolding(TAC** head, TAC** optimizedHead);
 void copyPropagation(TAC** head, TAC** optimizedHead);
 void deadCodeElimination(TAC** head, TAC** optimizedHead);
+bool isBinaryOperation(const char* operation);
 void renumberRegisters(TAC** head);
 void replaceVariablesWithTemp(TAC** head);
 bool isVariable(const char* str);
