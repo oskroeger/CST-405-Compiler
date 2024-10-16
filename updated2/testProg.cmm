@@ -1,0 +1,16 @@
+int x;
+int y;
+int z;
+int j;
+float p;
+float n;
+j =3;
+p = 1.0;
+n = 5.5 + 8.0;
+x = (5 + 2) * j;
+y = x - 4;
+z = y * (x + y);
+write x;
+write y;
+write z;
+write n;
