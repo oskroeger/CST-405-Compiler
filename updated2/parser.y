@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <float.h>
 #include <limits.h>
 #include "AST.h"
 #include "symbolTable.h"
@@ -107,9 +108,19 @@ VarDecl:
             exit(EXIT_FAILURE);
         }
         $$->type = NodeType_VarDecl;
-        $$->varDecl.varType = strdup($1);
-        $$->varDecl.varName = strdup($2);
-        addSymbol(symTab, $2, $1, INT_MIN);
+        // switch case between int and float
+        if (strcmp($1, "int") == 0) {
+            $$->varDecl.varType = strdup("int");
+            $$->varDecl.varName = strdup($2);
+            addSymbol(symTab, $2, $1, FLT_MIN);
+        } else if (strcmp($1, "float") == 0) {
+            $$->varDecl.varType = strdup("float");
+            $$->varDecl.varName = strdup($2);
+            addSymbol(symTab, $2, $1, FLT_MIN);
+        }
+        //$$->varDecl.varType = strdup($1);
+        //$$->varDecl.varName = strdup($2);
+        //addSymbol(symTab, $2, $1, INT_MIN);
 
         printf("[INFO] Variable declared: %s %s;\n", $1, $2);
     }
@@ -147,10 +158,22 @@ Stmt:
             YYABORT;
         }
 
+        // if value is int
+        if (strcmp(sym->type, "int") == 0) {
+            // Store the expression result in the symbol table
+            sym->intValue = evaluateIntExpr($3, symTab);
+            char* exprResult = generateExprTAC($3, symTab);
+            generateTAC("MOV", sym->name, exprResult, NULL);
+        } else if (strcmp(sym->type, "float") == 0) {
+            // Store the expression result in the symbol table
+            sym->floatValue = evaluateFloatExpr($3, symTab);
+            char* exprResult = generateExprTAC($3, symTab);
+            generateTAC("MOV", sym->name, exprResult, NULL);
+        }
         // Store the expression result in the symbol table
-        sym->intValue = evaluateExpr($3, symTab);
-        char* exprResult = generateExprTAC($3, symTab);
-        generateTAC("MOV", sym->name, exprResult, NULL);
+        //sym->intValue = evaluateIntExpr($3, symTab);
+        //char* exprResult = generateExprTAC($3, symTab);
+        //generateTAC("MOV", sym->name, exprResult, NULL);
 
         $$ = malloc(sizeof(ASTNode));
         if ($$ == NULL) {

@@ -10,6 +10,7 @@ typedef struct Symbol {
     char* name;
     char* type;
     int intValue;
+    float floatValue;
     struct Symbol* next;  // For handling collisions in the hash table
 } Symbol;
 
@@ -23,7 +24,7 @@ typedef struct SymbolTable {
 SymbolTable* createSymbolTable(int size);
 
 // Add a new symbol to the symbol table
-void addSymbol(SymbolTable* table, char* name, char* type, int value);
+void addSymbol(SymbolTable* table, char* name, char* type, float value);
 
 // Look up a symbol by name in the symbol table
 Symbol* lookupSymbol(SymbolTable* table, char* name);

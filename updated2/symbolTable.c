@@ -6,6 +6,7 @@
 
 
 
+
 // Function to create a new symbol table
 SymbolTable* createSymbolTable(int size) {
     SymbolTable* newTable = (SymbolTable*)malloc(sizeof(SymbolTable));
@@ -33,7 +34,7 @@ unsigned int hash(SymbolTable* table, char* name) {
 }
 
 // Function to add a symbol to the table
-void addSymbol(SymbolTable* table, char* name, char* type, int value) {
+void addSymbol(SymbolTable* table, char* name, char* type, float value) {
     if (table == NULL || table->table == NULL) {
         fprintf(stderr, "Symbol table or table array not initialized\n");
         return; // Early return if the table is not initialized
@@ -45,8 +46,17 @@ void addSymbol(SymbolTable* table, char* name, char* type, int value) {
         if (strcmp(name, sym->name) == 0) {
             // Found an existing symbol, update its type
             free(sym->type); // Free the old type string
+
+            // if type == int 
             sym->type = strdup(type); // Set new type
-            sym->intValue = value; // Update value
+            if (type == "int") {
+                sym->intValue = (int)value; // Update value
+            }
+            else if (type == "float") {
+                sym->floatValue = value; // Update value
+            }
+
+            //sym->intValue = (int)value; // Update value
             return; // Exit after updating
         }
     }

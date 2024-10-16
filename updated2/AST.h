@@ -91,6 +91,7 @@ const char* nodeTypeToString(NodeType type);
 void printIndent(int level);
 void freeAST(ASTNode* node);
 void traverseAST(ASTNode* node, int level);
-int evaluateExpr(ASTNode* expr, SymbolTable* symTab);
+int evaluateIntExpr(ASTNode* expr, SymbolTable* symTab);
+float evaluateFloatExpr(ASTNode* expr, SymbolTable* symTab);
 
 #endif // AST_H
