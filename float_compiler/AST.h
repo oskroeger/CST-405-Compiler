@@ -1,14 +1,11 @@
 #ifndef AST_H
 #define AST_H
 
-// Include standard libraries as needed, e.g., stdlib 
-// for memory management functions
 #include <stdlib.h>
 #include <stdio.h>
 #include "symbolTable.h"
 
-// NodeType enum to differentiate between different 
-// kinds of AST nodes
+// NodeType enum to differentiate between different kinds of AST nodes
 typedef enum { 
     NodeType_Program,
     NodeType_VarDeclList, 
@@ -20,14 +17,13 @@ typedef enum {
     NodeType_StmtList,
     NodeType_WriteStmt,
     NodeType_AssignStmt,
-    NodeType_BinOp, 
 } NodeType;
 
 // Structure for AST nodes
 typedef struct ASTNode {
     NodeType type;
     union {
-        struct{
+        struct {
             struct ASTNode* varDeclList;
             struct ASTNode* stmtList;
         } program;
@@ -45,26 +41,24 @@ typedef struct ASTNode {
         struct {
             int integer;
         } IntExpr;
-        
+
         struct {
             float floatNum;
         } FloatExpr;
 
-         struct {
+        struct {
             char* name;
         } simpleID;
 
         struct {
-            // Expression-specific fields
             char* operator;
-            struct ASTNode* left;  // Left operand
-            struct ASTNode* right; // Right operand
+            struct ASTNode* left;
+            struct ASTNode* right;
         } expr;
 
         struct {
-            // StatementList-specific fields
             struct ASTNode* stmt;
-            struct ASTNode* stmtList; 
+            struct ASTNode* stmtList;
         } stmtList;
 
         struct {
@@ -72,16 +66,10 @@ typedef struct ASTNode {
         } writeStmt;
 
         struct {
-            char* operator; // e.g., '='
             char* varName;
+            char* operator;
             struct ASTNode* expr;
         } assignStmt;
-
-        struct {
-            char* operator;
-            struct ASTNode* left;
-            struct ASTNode* right;
-        } binOp;
     };
 } ASTNode;
 
@@ -91,7 +79,6 @@ const char* nodeTypeToString(NodeType type);
 void printIndent(int level);
 void freeAST(ASTNode* node);
 void traverseAST(ASTNode* node, int level);
-int evaluateIntExpr(ASTNode* expr, SymbolTable* symTab);
-float evaluateFloatExpr(ASTNode* expr, SymbolTable* symTab);
+float evaluateExpr(ASTNode* expr, SymbolTable* symTab);
 
 #endif // AST_H

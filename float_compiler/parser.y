@@ -53,8 +53,6 @@ int parseErrorFlag = 0;  // Flag to indicate if an error occurred during parsing
 %left PLUS MINUS
 %left MULTIPLY DIVIDE
 
-%printer { fprintf(yyoutput, "%s", $$); } ID;
-
 %type <ast> Program VarDecl VarDeclList Stmt StmtList Expr
 %start Program
 
@@ -62,12 +60,7 @@ int parseErrorFlag = 0;  // Flag to indicate if an error occurred during parsing
 
 Program:
     VarDeclList StmtList {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for Program node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_Program;
+        $$ = createNode(NodeType_Program);
         $$->program.varDeclList = $1;
         $$->program.stmtList = $2;
         root = $$; // Set the global root pointer to the root of the AST
@@ -81,12 +74,7 @@ VarDeclList:
         $$ = NULL; // Handle case where there are no variable declarations
     }
     | VarDecl VarDeclList {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for VarDeclList node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_VarDeclList;
+        $$ = createNode(NodeType_VarDeclList);
         $$->varDeclList.varDecl = $1;
         $$->varDeclList.varDeclList = $2;
 
@@ -96,31 +84,18 @@ VarDeclList:
 
 VarDecl:
     TYPE ID SEMICOLON {
-        if (lookupSymbol(symTab, $2) != NULL) {
-            fprintf(stderr, "Error: Variable '%s' already declared at line %d.\n", $2, yylineno);
-            parseErrorFlag = 1;
-            YYABORT;
+        SymbolValue value;
+        if (strcmp($1, "int") == 0) {
+            value.intValue = INT_MIN; // Default value for uninitialized int
+            addSymbol(symTab, $2, TYPE_INT, value);
+        } else if (strcmp($1, "float") == 0) {
+            value.floatValue = FLT_MIN; // Default value for uninitialized float
+            addSymbol(symTab, $2, TYPE_FLOAT, value);
         }
 
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for VarDecl node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_VarDecl;
-        // switch case between int and float
-        if (strcmp($1, "int") == 0) {
-            $$->varDecl.varType = strdup("int");
-            $$->varDecl.varName = strdup($2);
-            addSymbol(symTab, $2, $1, FLT_MIN);
-        } else if (strcmp($1, "float") == 0) {
-            $$->varDecl.varType = strdup("float");
-            $$->varDecl.varName = strdup($2);
-            addSymbol(symTab, $2, $1, FLT_MIN);
-        }
-        //$$->varDecl.varType = strdup($1);
-        //$$->varDecl.varName = strdup($2);
-        //addSymbol(symTab, $2, $1, INT_MIN);
+        $$ = createNode(NodeType_VarDecl);
+        $$->varDecl.varType = strdup($1); // Set the variable type (e.g., "int", "float")
+        $$->varDecl.varName = strdup($2); // Set the variable name
 
         printf("[INFO] Variable declared: %s %s;\n", $1, $2);
     }
@@ -136,12 +111,7 @@ StmtList:
         $$ = NULL; // Handle the case where there are no statements
     }
     | Stmt StmtList {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for StmtList node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_StmtList;
+        $$ = createNode(NodeType_StmtList);
         $$->stmtList.stmt = $1;
         $$->stmtList.stmtList = $2;
 
@@ -158,31 +128,19 @@ Stmt:
             YYABORT;
         }
 
-        // if value is int
-        if (strcmp(sym->type, "int") == 0) {
-            // Store the expression result in the symbol table
-            sym->intValue = evaluateIntExpr($3, symTab);
+        if (sym->type == TYPE_INT) {
+            sym->value.intValue = (int)evaluateExpr($3, symTab);  // Cast to int
             char* exprResult = generateExprTAC($3, symTab);
             generateTAC("MOV", sym->name, exprResult, NULL);
-        } else if (strcmp(sym->type, "float") == 0) {
-            // Store the expression result in the symbol table
-            sym->floatValue = evaluateFloatExpr($3, symTab);
+        } else if (sym->type == TYPE_FLOAT) {
+            sym->value.floatValue = evaluateExpr($3, symTab);  // Handle float values
             char* exprResult = generateExprTAC($3, symTab);
             generateTAC("MOV", sym->name, exprResult, NULL);
         }
-        // Store the expression result in the symbol table
-        //sym->intValue = evaluateIntExpr($3, symTab);
-        //char* exprResult = generateExprTAC($3, symTab);
-        //generateTAC("MOV", sym->name, exprResult, NULL);
 
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for AssignStmt node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_AssignStmt;
+        $$ = createNode(NodeType_AssignStmt);
         $$->assignStmt.varName = strdup($1);
-        $$->assignStmt.operator = $2;
+        $$->assignStmt.operator = strdup($2);
         $$->assignStmt.expr = $3;
 
         printf("[INFO] Assignment statement recognized: %s = ...;\n", $1);
@@ -200,12 +158,7 @@ Stmt:
             YYABORT;
         }
 
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for WriteStmt node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_WriteStmt;
+        $$ = createNode(NodeType_WriteStmt);
         $$->writeStmt.id = strdup($2);
 
         generateTAC("WRITE", $$->writeStmt.id, NULL, NULL);
@@ -225,54 +178,34 @@ Stmt:
 
 Expr:
     Expr PLUS Expr {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for Expr node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_Expr;
+        $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = $2;
+        $$->expr.operator = strdup($2);
 
         printf("[INFO] Expression recognized: ... + ...\n");
     }
     | Expr MINUS Expr {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for Expr node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_Expr;
+        $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = $2;
+        $$->expr.operator = strdup($2);
 
         printf("[INFO] Expression recognized: ... - ...\n");
     }
     | Expr MULTIPLY Expr {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for Expr node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_Expr;
+        $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = $2;
+        $$->expr.operator = strdup($2);
 
         printf("[INFO] Expression recognized: ... * ...\n");
     }
     | Expr DIVIDE Expr {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for Expr node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_Expr;
+        $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = $2;
+        $$->expr.operator = strdup($2);
 
         printf("[INFO] Expression recognized: ... / ...\n");
     }
@@ -288,34 +221,19 @@ Expr:
             YYABORT;
         }
 
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for SimpleID node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_SimpleID;
-        $$->simpleID.name = $1;
+        $$ = createNode(NodeType_SimpleID);
+        $$->simpleID.name = strdup($1);
 
         printf("[INFO] Identifier recognized: %s\n", $1);
     }
     | INTEGER {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for IntExpr node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_IntExpr;
+        $$ = createNode(NodeType_IntExpr);
         $$->IntExpr.integer = $1;
 
         printf("[INFO] Integer recognized: %d\n", $1);
     }
     | FLOAT {
-        $$ = malloc(sizeof(ASTNode));
-        if ($$ == NULL) {
-            fprintf(stderr, "Memory allocation failed for FloatExpr node.\n");
-            exit(EXIT_FAILURE);
-        }
-        $$->type = NodeType_FloatExpr;
+        $$ = createNode(NodeType_FloatExpr);
         $$->FloatExpr.floatNum = $1;
 
         printf("[INFO] FLOAT recognized: %f\n", $1);
@@ -366,11 +284,11 @@ int main() {
 
         // Print the optimized TAC
         printf("\n----- OPTIMIZED TAC -----\n");
-		printOptimizedTAC();
+        // printOptimizedTAC();
 
         // Generate MIPS code from the TAC
         printf("\n----- GENERATED MIPS CODE -----\n");
-        generateMIPS(tacHead);
+        // generateMIPS(tacHead);
 
         // Clean up the AST
         if (root != NULL) {

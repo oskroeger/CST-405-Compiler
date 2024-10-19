@@ -1,6 +1,6 @@
 #include "AST.h"
 #include <float.h>
-
+#include <string.h>
 
 int indentValue = 2;
 
@@ -22,13 +22,11 @@ const char* nodeTypeToString(NodeType type) {
         case NodeType_Expr: return "Expression";
         case NodeType_StmtList: return "Statements";
         case NodeType_AssignStmt: return "Assignment Statement";
-        case NodeType_BinOp: return "Binary Operation";
         default: return "Unknown";
     }
 }
 
 void traverseAST(ASTNode* node, int level) {
-    
     if (!node) {
         return;
     }
@@ -76,11 +74,6 @@ void traverseAST(ASTNode* node, int level) {
             printf(": %s = \n", node->assignStmt.varName);
             traverseAST(node->assignStmt.expr, level + 1);
             break;
-        case NodeType_BinOp:
-            printf(": Operator '%s'\n", node->binOp.operator);
-            traverseAST(node->binOp.left, level + 1);
-            traverseAST(node->binOp.right, level + 1);
-            break;
         default:
             printf(" (Unknown node type)\n");
             break;
@@ -116,6 +109,7 @@ void freeAST(ASTNode* node) {
             free(node->simpleID.name);
             break;
         case NodeType_Expr:
+            free(node->expr.operator);
             freeAST(node->expr.left);
             freeAST(node->expr.right);
             break;
@@ -126,10 +120,6 @@ void freeAST(ASTNode* node) {
         case NodeType_AssignStmt:
             free(node->assignStmt.varName);
             freeAST(node->assignStmt.expr);
-            break;
-        case NodeType_BinOp:
-            freeAST(node->binOp.left);
-            freeAST(node->binOp.right);
             break;
     }
 
@@ -173,7 +163,7 @@ ASTNode* createNode(NodeType type) {
             newNode->writeStmt.id = NULL;
             break;
         case NodeType_Expr:
-            newNode->expr.operator = '\0';
+            newNode->expr.operator = NULL; // Initialize operator to NULL
             newNode->expr.left = NULL;
             newNode->expr.right = NULL;
             break;
@@ -186,86 +176,36 @@ ASTNode* createNode(NodeType type) {
             newNode->assignStmt.varName = NULL;
             newNode->assignStmt.expr = NULL;
             break;
-        case NodeType_BinOp:
-            newNode->binOp.operator = '\0';
-            newNode->binOp.left = NULL;
-            newNode->binOp.right = NULL;
-            break;
         // Add more cases as necessary for other node types
     }
 
     return newNode;
 }
 
-int evaluateIntExpr(ASTNode* expr, SymbolTable* symTab) {
+float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
     if (expr->type == NodeType_IntExpr) {
-        // If the node is a simple expression with a number, return the number
-        return expr->IntExpr.integer;
-    } else if (expr->type == NodeType_SimpleID) {
-        // Look up the symbol to ensure it has been declared
-        Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
-        if (sym != NULL) {
-            // Check if the variable has been initialized (not INT_MIN)
-            if (sym->intValue == INT_MIN) {
-                fprintf(stderr, "Error: Variable '%s' used before being defined.\n", expr->simpleID.name);
-                exit(EXIT_FAILURE);
-            }
-            return sym->intValue;
-        } else {
-            fprintf(stderr, "Error: Variable '%s' used before declaration.\n", expr->simpleID.name);
-            exit(EXIT_FAILURE);
-        }
-    } else if (expr->type == NodeType_Expr) {
-        // Recursively evaluate left and right sides of the expression
-        int leftVal = evaluateIntExpr(expr->expr.left, symTab);
-        int rightVal = evaluateIntExpr(expr->expr.right, symTab);
-
-        // Handle the supported operators
-        if (strcmp(expr->expr.operator, "+") == 0) {
-            return leftVal + rightVal;
-        } else if (strcmp(expr->expr.operator, "-") == 0) {
-            return leftVal - rightVal;
-        } else if (strcmp(expr->expr.operator, "*") == 0) {
-            return leftVal * rightVal;
-        } else if (strcmp(expr->expr.operator, "/") == 0) {
-            // Check for division by zero
-            if (rightVal == 0) {
-                fprintf(stderr, "Error: Division by zero.\n");
-                exit(EXIT_FAILURE);
-            }
-            return leftVal / rightVal;
-        } else {
-            fprintf(stderr, "Error: Unsupported operator '%s'.\n", expr->expr.operator);
-            exit(EXIT_FAILURE);
-        }
-    }
-    return 0; // Default return value if evaluation fails
-}
-
-float evaluateFloatExpr(ASTNode* expr, SymbolTable* symTab) {
-    if (expr->type == NodeType_FloatExpr) {
-        // If the node is a simple expression with a number, return the number
+        return (float) expr->IntExpr.integer;
+    } else if (expr->type == NodeType_FloatExpr) {
         return expr->FloatExpr.floatNum;
     } else if (expr->type == NodeType_SimpleID) {
-        // Look up the symbol to ensure it has been declared
         Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
         if (sym != NULL) {
-            // Check if the variable has been initialized (not FLT_MIN)
-            if (sym->floatValue == FLT_MIN) {
+            if (sym->type == TYPE_INT && sym->value.intValue != INT_MIN) {
+                return (float) sym->value.intValue;
+            } else if (sym->type == TYPE_FLOAT && sym->value.floatValue != FLT_MIN) {
+                return sym->value.floatValue;
+            } else {
                 fprintf(stderr, "Error: Variable '%s' used before being defined.\n", expr->simpleID.name);
                 exit(EXIT_FAILURE);
             }
-            return sym->floatValue;
         } else {
             fprintf(stderr, "Error: Variable '%s' used before declaration.\n", expr->simpleID.name);
             exit(EXIT_FAILURE);
         }
     } else if (expr->type == NodeType_Expr) {
-        // Recursively evaluate left and right sides of the expression
-        int leftVal = evaluateFloatExpr(expr->expr.left, symTab);
-        int rightVal = evaluateFloatExpr(expr->expr.right, symTab);
+        float leftVal = evaluateExpr(expr->expr.left, symTab);
+        float rightVal = evaluateExpr(expr->expr.right, symTab);
 
-        // Handle the supported operators
         if (strcmp(expr->expr.operator, "+") == 0) {
             return leftVal + rightVal;
         } else if (strcmp(expr->expr.operator, "-") == 0) {
@@ -273,7 +213,6 @@ float evaluateFloatExpr(ASTNode* expr, SymbolTable* symTab) {
         } else if (strcmp(expr->expr.operator, "*") == 0) {
             return leftVal * rightVal;
         } else if (strcmp(expr->expr.operator, "/") == 0) {
-            // Check for division by zero
             if (rightVal == 0) {
                 fprintf(stderr, "Error: Division by zero.\n");
                 exit(EXIT_FAILURE);
@@ -284,5 +223,5 @@ float evaluateFloatExpr(ASTNode* expr, SymbolTable* symTab) {
             exit(EXIT_FAILURE);
         }
     }
-    return 0; // Default return value if evaluation fails
+    return 0.0;
 }

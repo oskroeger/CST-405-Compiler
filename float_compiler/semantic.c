@@ -1,5 +1,7 @@
 #include "semantic.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Define global variables
 TAC* tacHead = NULL;
@@ -9,86 +11,113 @@ int tempVarIntCounter = 0;
 
 char* generateTempIntVar() {
     char* tempVar = (char*)malloc(10 * sizeof(char));
+    if (!tempVar) {
+        fprintf(stderr, "Memory allocation failed for tempVar.\n");
+        exit(EXIT_FAILURE);
+    }
     sprintf(tempVar, "t%d", tempVarIntCounter++);
     return tempVar;
 }
+
 char* generateTempFloatVar() {
     char* tempVar = (char*)malloc(10 * sizeof(char));
+    if (!tempVar) {
+        fprintf(stderr, "Memory allocation failed for tempVar.\n");
+        exit(EXIT_FAILURE);
+    }
     sprintf(tempVar, "f%d", tempVarFloatCounter++);
     return tempVar;
 }
 
+// Function to print the Three-Address Code (TAC)
+void printTAC() {
+    TAC* current = tacHead;  // Start from the head of the TAC list
+    printf("\n----- GENERATED TAC -----\n");
+    while (current != NULL) {
+        // Print the TAC in a readable format
+        if (current->operand2) {
+            // For binary operations like ADD, SUB, etc.
+            printf("%s = %s %s %s\n", current->result, current->operand1, current->operation, current->operand2);
+        } else if (current->operand1) {
+            // For unary operations like MOV
+            printf("%s = %s %s\n", current->result, current->operation, current->operand1);
+        } else {
+            // For operations that only involve the result (like return statements)
+            printf("%s = %s\n", current->result, current->operation);
+        }
+        current = current->next;  // Move to the next TAC instruction
+    }
+    printf("-------------------------\n");
+}
+
 char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
     if (expr->type == NodeType_IntExpr) {
-        // Handle simple expressions (constants)
         char* tempVar = generateTempIntVar();
         char valueStr[20];
         sprintf(valueStr, "%d", expr->IntExpr.integer);
-        generateTAC("MOV", tempVar, valueStr, NULL);  // Move constant into temp variable
+        generateTAC("MOV", tempVar, valueStr, NULL);
         return tempVar;
     } else if (expr->type == NodeType_FloatExpr) {
-        // Handle simple expressions (constants)
         char* tempVar = generateTempFloatVar();
         char valueStr[20];
         sprintf(valueStr, "%f", expr->FloatExpr.floatNum);
-        generateTAC("MOV", tempVar, valueStr, NULL);  // Move constant into temp variable
+        generateTAC("MOV", tempVar, valueStr, NULL);
         return tempVar;
-     } else if (expr->type == NodeType_SimpleID) {
-        // Handle variable references
+    } else if (expr->type == NodeType_SimpleID) {
         Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
         if (sym != NULL) {
-            return sym->name;  // Return the variable name directly
+            return sym->name;
         } else {
             fprintf(stderr, "Error: Variable %s used before declaration.\n", expr->simpleID.name);
             exit(EXIT_FAILURE);
         }
     } else if (expr->type == NodeType_Expr) {
-        // Recursively generate TAC for left and right sub-expressions
         char* leftVar = generateExprTAC(expr->expr.left, symTab);
         char* rightVar = generateExprTAC(expr->expr.right, symTab);
-        // if either left or right is a float, the result should be a float
-        if (strcmp(determineExprType(expr->expr.left, symTab), "float") == 0 || strcmp(determineExprType(expr->expr.right, symTab), "float") == 0) {
-            char* tempVar = generateTempFloatVar();
 
-            // Handle the different operators
-            if (strcmp(expr->expr.operator, "+") == 0) {
-                generateTAC("ADD", tempVar, leftVar, rightVar);
-            } else if (strcmp(expr->expr.operator, "-") == 0) {
-                generateTAC("SUB", tempVar, leftVar, rightVar);
-            } else if (strcmp(expr->expr.operator, "*") == 0) {
-                generateTAC("MUL", tempVar, leftVar, rightVar);
-            } else if (strcmp(expr->expr.operator, "/") == 0) {
-                // Add division by zero check if needed
+        SymbolType leftType = determineExprType(expr->expr.left, symTab);
+        SymbolType rightType = determineExprType(expr->expr.right, symTab);
+
+        char* tempVar = NULL;
+
+        // If one of the operands is float, promote the int to float
+        if (leftType == TYPE_INT && rightType == TYPE_FLOAT) {
+            char* promotedLeft = generateTempFloatVar();
+            generateTAC("CAST_TO_FLOAT", promotedLeft, leftVar, NULL);
+            leftVar = promotedLeft;
+            tempVar = generateTempFloatVar();
+        } else if (leftType == TYPE_FLOAT && rightType == TYPE_INT) {
+            char* promotedRight = generateTempFloatVar();
+            generateTAC("CAST_TO_FLOAT", promotedRight, rightVar, NULL);
+            rightVar = promotedRight;
+            tempVar = generateTempFloatVar();
+        } else if (leftType == TYPE_INT && rightType == TYPE_INT) {
+            tempVar = generateTempIntVar();
+        } else if (leftType == TYPE_FLOAT && rightType == TYPE_FLOAT) {
+            tempVar = generateTempFloatVar();
+        }
+
+        if (strcmp(expr->expr.operator, "+") == 0) {
+            generateTAC("ADD", tempVar, leftVar, rightVar);
+        } else if (strcmp(expr->expr.operator, "-") == 0) {
+            generateTAC("SUB", tempVar, leftVar, rightVar);
+        } else if (strcmp(expr->expr.operator, "*") == 0) {
+            generateTAC("MUL", tempVar, leftVar, rightVar);
+        } else if (strcmp(expr->expr.operator, "/") == 0) {
+            if (rightType == TYPE_INT || rightType == TYPE_FLOAT) {
                 generateTAC("DIV", tempVar, leftVar, rightVar);
             } else {
-                fprintf(stderr, "Error: Unsupported operator '%s'.\n", expr->expr.operator);
+                fprintf(stderr, "Semantic Error: Division by zero.\n");
                 exit(EXIT_FAILURE);
             }
-            return tempVar;
         }
-        // if both left and right are integers, the result should be an integer
-        else if (strcmp(determineExprType(expr->expr.left, symTab), "int") == 0 && strcmp(determineExprType(expr->expr.right, symTab), "int") == 0) {
-            char* tempVar = generateTempIntVar();
 
-            // Handle the different operators
-            if (strcmp(expr->expr.operator, "+") == 0) {
-                generateTAC("ADD", tempVar, leftVar, rightVar);
-            } else if (strcmp(expr->expr.operator, "-") == 0) {
-                generateTAC("SUB", tempVar, leftVar, rightVar);
-            } else if (strcmp(expr->expr.operator, "*") == 0) {
-                generateTAC("MUL", tempVar, leftVar, rightVar);
-            } else if (strcmp(expr->expr.operator, "/") == 0) {
-                // Add division by zero check if needed
-                generateTAC("DIV", tempVar, leftVar, rightVar);
-            } else {
-                fprintf(stderr, "Error: Unsupported operator '%s'.\n", expr->expr.operator);
-                exit(EXIT_FAILURE);
-            }
-            return tempVar;
-        }
-    return NULL; // Default return value if TAC generation fails
-    } 
+        return tempVar;
+    }
+
+    return NULL;
 }
+
 
 void generateTAC(const char* operation, const char* result, const char* operand1, const char* operand2) {
     TAC* newTAC = (TAC*)malloc(sizeof(TAC));
@@ -110,118 +139,27 @@ void generateTAC(const char* operation, const char* result, const char* operand1
     tacTail = newTAC;
 }
 
-
-void printTAC() {
-    static int tacWrittenToFile = 0;  // Static flag to track if the TAC has already been written to the file
-    TAC* current = tacHead;
-    FILE* tacFile = NULL;
-
-    // Only open the file and write if it's the first time this function is called
-    if (!tacWrittenToFile) {
-        tacFile = fopen("TAC.ir", "w");  // Open the file for writing
-        if (tacFile == NULL) {
-            fprintf(stderr, "Error: Could not open TAC.ir for writing.\n");
-            return;
-        }
-        tacWrittenToFile = 1;  // Set the flag to prevent further file writes
-    }
-
-    while (current != NULL) {
-        // Ensure that each part of the TAC is checked for NULL to prevent crashes.
-        const char* result = current->result ? current->result : "";
-        const char* operand1 = current->operand1 ? current->operand1 : "";
-        const char* operation = current->operation ? current->operation : "";
-        const char* operand2 = current->operand2 ? current->operand2 : "";
-
-        // Print format depending on operation type.
-        if (strcmp(operation, "MOV") == 0) {
-            printf("%s = %s %s\n", result, operation, operand1);
-            if (tacFile) fprintf(tacFile, "%s = %s %s\n", result, operation, operand1);
-        } else if (strlen(operand2) > 0) {
-            printf("%s = %s %s %s\n", result, operand1, operation, operand2);
-            if (tacFile) fprintf(tacFile, "%s = %s %s %s\n", result, operand1, operation, operand2);
-        } else {
-            printf("%s = %s %s\n", result, operation, operand1);
-            if (tacFile) fprintf(tacFile, "%s = %s %s\n", result, operation, operand1);
-        }
-
-        current = current->next;
-    }
-
-    if (tacFile) {
-        fclose(tacFile);  // Close the file after writing
-    }
-}
-
-
-void printOptimizedTAC() {
-    static int optimizedTACWrittenToFile = 0;  // Static flag to track if the optimized TAC has been written to the file
-    TAC* current = tacHead; // Assuming tacHead points to the optimized TAC after optimization
-    FILE* tacFile = NULL;
-
-    // Only open the file and write if it's the first time this function is called
-    if (!optimizedTACWrittenToFile) {
-        tacFile = fopen("TACOptimized.ir", "w");  // Open the file for writing
-        if (tacFile == NULL) {
-            fprintf(stderr, "Error: Could not open TACOptimized.ir for writing.\n");
-            return;
-        }
-        optimizedTACWrittenToFile = 1;  // Set the flag to prevent further file writes
-    }
-
-    while (current != NULL) {
-        // Ensure that each part of the TAC is checked for NULL to prevent crashes.
-        const char* result = current->result ? current->result : "";
-        const char* operand1 = current->operand1 ? current->operand1 : "";
-        const char* operation = current->operation ? current->operation : "";
-        const char* operand2 = current->operand2 ? current->operand2 : "";
-
-        // Print format depending on operation type.
-        if (strcmp(operation, "MOV") == 0) {
-            printf("%s = %s %s\n", result, operation, operand1);
-            if (tacFile) fprintf(tacFile, "%s = %s %s\n", result, operation, operand1);
-        } else if (strlen(operand2) > 0) {
-            printf("%s = %s %s %s\n", result, operand1, operation, operand2);
-            if (tacFile) fprintf(tacFile, "%s = %s %s %s\n", result, operand1, operation, operand2);
-        } else {
-            printf("%s = %s %s\n", result, operation, operand1);
-            if (tacFile) fprintf(tacFile, "%s = %s %s\n", result, operation, operand1);
-        }
-
-        current = current->next;
-    }
-
-    if (tacFile) {
-        fclose(tacFile);  // Close the file after writing
-    }
-}
-
-
-
-
-char* determineExprType(ASTNode* expr, SymbolTable* symTab) {
-    if (!expr) return NULL;
+SymbolType determineExprType(ASTNode* expr, SymbolTable* symTab) {
+    if (!expr) return TYPE_UNKNOWN;
 
     switch (expr->type) {
         case NodeType_IntExpr:
-            return "int";  // Assuming the expression is an integer
+            return TYPE_INT;  // Integer expression
         case NodeType_FloatExpr:
-            return "float";  // Assuming the expression is an integer
+            return TYPE_FLOAT;  // Float expression
         case NodeType_SimpleID: {
             Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
-            if (sym) return sym->type;  // Return the type of the variable
-            else {
+            if (sym) {
+                return sym->type;  // Return the variable's type
+            } else {
                 fprintf(stderr, "Semantic Error: Variable %s used before declaration.\n", expr->simpleID.name);
                 exit(EXIT_FAILURE);
             }
         }
         case NodeType_Expr:
-            // Assuming binary operations only between same types (e.g., int + int)
-            // You can extend this logic for more complex types
-            return determineExprType(expr->expr.left, symTab);
-        // Add more cases as needed for other node types
+            return determineExprType(expr->expr.left, symTab);  // Binary expression
         default:
-            return NULL;  // Unknown type
+            return TYPE_UNKNOWN;  // Unknown type for unhandled cases
     }
 }
 
@@ -241,7 +179,6 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
             break;
 
         case NodeType_VarDecl:
-            // Variable declaration; ensure the variable is added to the symbol table elsewhere
             printf("Adding variable '%s' of type '%s' to the symbol table.\n", node->varDecl.varName, node->varDecl.varType);
             break;
 
@@ -254,7 +191,6 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
             break;
 
         case NodeType_SimpleID: {
-            // Ensure variable is declared
             printf("Looking up variable '%s'...\n", node->simpleID.name);
             Symbol* sym = lookupSymbol(symTab, node->simpleID.name);
             if (!sym) {
@@ -264,7 +200,7 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
             break;
         }
 
-        case NodeType_Expr:
+        case NodeType_Expr: {
             printf("Checking expression with operator '%s'...\n", node->expr.operator);
 
             // Recursively check left and right sides
@@ -272,14 +208,15 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
             semanticCheck(node->expr.right, symTab);
 
             // Type checking for binary operations
-            char* leftType = determineExprType(node->expr.left, symTab);
-            char* rightType = determineExprType(node->expr.right, symTab);
-            if (strcmp(leftType, rightType) != 0) {
+            SymbolType leftType = determineExprType(node->expr.left, symTab);
+            SymbolType rightType = determineExprType(node->expr.right, symTab);
+            if (leftType != rightType) {
                 fprintf(stderr, "Semantic Error: Type mismatch in expression with operator '%s'. Left type: %s, Right type: %s.\n",
-                        node->expr.operator, leftType, rightType);
+                        node->expr.operator, symbolTypeToString(leftType), symbolTypeToString(rightType));
                 exit(EXIT_FAILURE);
             }
             break;
+        }
 
         case NodeType_StmtList:
             semanticCheck(node->stmtList.stmt, symTab);
@@ -287,7 +224,6 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
             break;
 
         case NodeType_WriteStmt: {
-            // Ensure the variable being written is declared
             printf("Checking write statement for variable '%s'...\n", node->writeStmt.id);
             Symbol* sym = lookupSymbol(symTab, node->writeStmt.id);
             if (!sym) {
@@ -305,15 +241,14 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
                 exit(EXIT_FAILURE);
             }
 
-            // Check if assignment type matches variable type
-            char* exprType = determineExprType(node->assignStmt.expr, symTab);
-            if (strcmp(sym->type, exprType) != 0) {
+            // Type checking for assignments
+            SymbolType exprType = determineExprType(node->assignStmt.expr, symTab);
+            if (sym->type != exprType) {
                 fprintf(stderr, "Semantic Error: Type mismatch in assignment to '%s'. Expected: %s, Found: %s.\n",
-                        node->assignStmt.varName, sym->type, exprType);
+                        node->assignStmt.varName, symbolTypeToString(sym->type), symbolTypeToString(exprType));
                 exit(EXIT_FAILURE);
             }
 
-            // Check the expression being assigned
             semanticCheck(node->assignStmt.expr, symTab);
             break;
         }
@@ -323,8 +258,6 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
             exit(EXIT_FAILURE);
     }
 }
-
-
 
 void checkSemantics(ASTNode* root, SymbolTable* symTab) {
     semanticCheck(root, symTab);
