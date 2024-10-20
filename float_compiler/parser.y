@@ -282,13 +282,9 @@ int main() {
         // Step 2: Optimize the cleaned-up TAC
         optimizeTAC(&tacHead);
 
-        // Print the optimized TAC
-        printf("\n----- OPTIMIZED TAC -----\n");
-        // printOptimizedTAC();
-
         // Generate MIPS code from the TAC
         printf("\n----- GENERATED MIPS CODE -----\n");
-        // generateMIPS(tacHead);
+        generateMIPS(tacHead);
 
         // Clean up the AST
         if (root != NULL) {

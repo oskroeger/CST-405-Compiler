@@ -29,19 +29,18 @@ void optimizeTAC(TAC** head) {
     constantFolding(head, &optimizedHead);
 
     // Apply copy propagation
-    // TAC* propagatedHead = NULL;
-    // copyPropagation(&optimizedHead, &propagatedHead);
+    TAC* propagatedHead = NULL;
+    copyPropagation(&optimizedHead, &propagatedHead);
 
     // Apply dead code elimination
-    // TAC* finalOptimizedHead = NULL;
-    // deadCodeElimination(&propagatedHead, &finalOptimizedHead);
+    TAC* finalOptimizedHead = NULL;
+    deadCodeElimination(&propagatedHead, &finalOptimizedHead);
 
     // Renumber registers to maintain a clean sequence
-    // renumberRegisters(&finalOptimizedHead);
+    renumberRegisters(&finalOptimizedHead);
 
     // Update the original head to point to the fully optimized TAC
-    // *head = finalOptimizedHead;
-    *head = optimizedHead;
+    *head = finalOptimizedHead;
 }
 
 void constantFolding(TAC** head, TAC** optimizedHead) {
@@ -164,13 +163,11 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
         if (strcmp(current->operation, "MOV") == 0 && isTemp(current->operand1)) {
             // Track that the current temp result holds the same value as operand1
             int index = atoi(&current->result[1]);
-            copyMap[index] = strdup(current->operand1);
-
+            copyMap[index] = strdup(current->operand1); // Save the copied operand
         } else if (strcmp(current->operation, "WRITE") == 0) {
             // Do NOT propagate copies into WRITE operations, use the original temp
             TAC* newTAC = createTAC(current->operation, current->result, NULL, NULL, current->type);
             appendTAC(optimizedHead, newTAC);
-
         } else {
             // Replace operands with their propagated values if they exist
             char* operand1 = current->operand1;
@@ -204,6 +201,13 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
                temp->operation, 
                temp->operand2 ? temp->operand2 : "");
         temp = temp->next;
+    }
+
+    // Clean up copyMap to free allocated memory
+    for (int i = 0; i < 100; i++) {
+        if (copyMap[i]) {
+            free(copyMap[i]);
+        }
     }
 }
 

@@ -32,7 +32,6 @@ char* generateTempFloatVar() {
 // Function to print the Three-Address Code (TAC)
 void printTAC() {
     TAC* current = tacHead;  // Start from the head of the TAC list
-    printf("\n----- GENERATED TAC -----\n");
     while (current != NULL) {
         // Print the TAC in a readable format
         if (current->operand2) {
@@ -47,7 +46,6 @@ void printTAC() {
         }
         current = current->next;  // Move to the next TAC instruction
     }
-    printf("-------------------------\n");
 }
 
 char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
