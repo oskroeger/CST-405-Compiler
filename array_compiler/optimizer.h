@@ -22,6 +22,7 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead);
 bool isBinaryOperation(const char* operation);
 void renumberRegisters(TAC** head);
 void replaceVariablesWithTemp(TAC** head);
+bool isArrayAccess(const char* str);
 bool isVariable(const char* str);
 bool isTemp(const char* str);
 bool isConstant(const char* str);

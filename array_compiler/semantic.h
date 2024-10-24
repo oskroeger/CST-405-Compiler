@@ -14,19 +14,25 @@ typedef struct TAC {
     struct TAC* next;    // Pointer to the next TAC instruction
 } TAC;
 
-
 extern TAC* tacHead;  // Head of the TAC linked list
 extern TAC* tacTail;  // Tail of the TAC linked list
 
+// Function prototypes for TAC generation and manipulation
 void generateTAC(const char* operation, const char* result, const char* operand1, const char* operand2);
-void printTAC();
-void printOptimizedTAC();
-char* generateTempVar();
+void printTAC();  // Prints the generated TAC
+
+// Temporary variable generation for different types
+char* generateTempIntVar();   // Generate a temporary variable for int expressions
+char* generateTempFloatVar(); // Generate a temporary variable for float expressions
+
+// Expression handling and TAC generation
 char* generateExprTAC(ASTNode* expr, SymbolTable* symTab);
+
+// Semantic checks and AST traversal
 void semanticCheck(ASTNode* node, SymbolTable* symTab);
 void checkSemantics(ASTNode* root, SymbolTable* symTab);
 
-// Updated to return SymbolType instead of char*
+// Determine expression type during semantic analysis
 SymbolType determineExprType(ASTNode* expr, SymbolTable* symTab);
 
 #endif // SEMANTIC_H

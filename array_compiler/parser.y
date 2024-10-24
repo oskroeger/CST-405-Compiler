@@ -183,15 +183,10 @@ Stmt:
             YYABORT;
         }
 
-        if (sym->type == TYPE_INT) {
-            int value = (int)evaluateExpr($3, symTab);  // Assign to int array element
-            printf("[DEBUG] Assigning value to %s[%d]: %d\n", $1->arrayAccess.arrayName, index, value); // Debug print
-            sym->value.intArray[index] = value;  
-        } else if (sym->type == TYPE_FLOAT) {
-            float value = evaluateExpr($3, symTab);  // Assign to float array element
-            printf("[DEBUG] Assigning value to %s[%d]: %f\n", $1->arrayAccess.arrayName, index, value); // Debug print
-            sym->value.floatArray[index] = value;  
-        }
+        // Evaluate the value to be assigned
+        int value = (int)evaluateExpr($3, symTab); // Get the value to assign
+        printf("[DEBUG] Assigning value to %s[%d]: %d\n", $1->arrayAccess.arrayName, index, value); // Debug print
+        sym->value.intArray[index] = value;  
 
         // Assign the value to x if the index is 2
         if (index == 2) {
@@ -201,6 +196,16 @@ Stmt:
                 printf("[DEBUG] Assigning value to x: %d\n", xSym->value.intValue); // Debug print
             }
         }
+
+        // Generate TAC for the array assignment
+        char* exprResult = generateExprTAC($3, symTab);
+
+        // Create a temporary variable to hold the index as a string
+        char indexStr[10];
+        sprintf(indexStr, "%d", index);  // Convert the index to string
+
+        // Pass the name of the array and the index as a string
+        generateTAC("MOV", sym->name, exprResult, indexStr); 
 
         $$ = createNode(NodeType_AssignStmt);
         $$->assignStmt.varName = strdup($1->arrayAccess.arrayName);
@@ -330,7 +335,7 @@ int main() {
         printf("\n\n--- Parsing successful! ---\n\n");
 
         // Perform semantic analysis
-        // checkSemantics(root, symTab);
+        checkSemantics(root, symTab);
 
         printf("\n----- ABSTRACT SYNTAX TREE -----\n");
         if (root != NULL) {
@@ -341,11 +346,11 @@ int main() {
 
         // After TAC generation
         printf("\n----- GENERATED TAC (BEFORE OPTIMIZATION) -----\n");
-        // printTAC();
+        printTAC();
 
         // Step 1: Clean the TAC by replacing variable references with temp vars
         printf("\n----- CLEANED TAC -----\n");
-        // replaceVariablesWithTemp(&tacHead);
+        replaceVariablesWithTemp(&tacHead);
         // printTAC();
 
         // Step 2: Optimize the cleaned-up TAC

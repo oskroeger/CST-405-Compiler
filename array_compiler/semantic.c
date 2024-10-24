@@ -1,5 +1,7 @@
 #include "semantic.h"
 #include <stdio.h>
+#include <ctype.h>
+#include <float.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -29,24 +31,65 @@ char* generateTempFloatVar() {
     return tempVar;
 }
 
-// Function to print the Three-Address Code (TAC)
+
+void generateTAC(const char* operation, const char* result, const char* operand1, const char* operand2) {
+    TAC* newTAC = (TAC*)malloc(sizeof(TAC));
+    if (newTAC == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for TAC.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Handle array access by incorporating the index into the result variable
+    if (result && operand2 && isdigit(operand2[0])) {
+        char tempResult[50];
+        sprintf(tempResult, "%s[%s]", result, operand2);  // Format as arr[index]
+        newTAC->result = strdup(tempResult);
+        
+        // Ensure the operation is MOV before assigning to the array
+        newTAC->operation = strdup("MOV");
+    } else {
+        newTAC->result = result ? strdup(result) : NULL;
+        newTAC->operation = strdup(operation);  // Preserve other operations like ADD, MUL, etc.
+    }
+
+    // Preserve the first operand (e.g., t0, t1, etc.)
+    newTAC->operand1 = operand1 ? strdup(operand1) : NULL;
+
+    // We don't need operand2 in the TAC if it's used for array indexing
+    newTAC->operand2 = operand2 && !isdigit(operand2[0]) ? strdup(operand2) : NULL;
+
+    newTAC->next = NULL;
+
+    // Add the new TAC instruction to the list
+    if (tacTail == NULL) {
+        tacHead = newTAC;
+    } else {
+        tacTail->next = newTAC;
+    }
+    tacTail = newTAC;
+}
+
+
+
 void printTAC() {
-    TAC* current = tacHead;  // Start from the head of the TAC list
+    TAC* current = tacHead;
     while (current != NULL) {
-        // Print the TAC in a readable format
         if (current->operand2) {
             // For binary operations like ADD, SUB, etc.
             printf("%s = %s %s %s\n", current->result, current->operand1, current->operation, current->operand2);
         } else if (current->operand1) {
             // For unary operations like MOV
+            // Always include the operation even for array accesses
             printf("%s = %s %s\n", current->result, current->operation, current->operand1);
         } else {
             // For operations that only involve the result (like return statements)
             printf("%s = %s\n", current->result, current->operation);
         }
-        current = current->next;  // Move to the next TAC instruction
+        current = current->next;
     }
 }
+
+
 
 char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
     if (expr->type == NodeType_IntExpr) {
@@ -69,6 +112,22 @@ char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
             fprintf(stderr, "Error: Variable %s used before declaration.\n", expr->simpleID.name);
             exit(EXIT_FAILURE);
         }
+    } else if (expr->type == NodeType_ArrayAccess) {
+        // Handle array access and map it to the temp variable holding the value
+        Symbol* sym = lookupSymbol(symTab, expr->arrayAccess.arrayName);
+        if (sym == NULL) {
+            fprintf(stderr, "Error: Array %s used before declaration.\n", expr->arrayAccess.arrayName);
+            exit(EXIT_FAILURE);
+        }
+
+        // Evaluate the index and generate the TAC to load the value
+        int index = (int)evaluateExpr(expr->arrayAccess.index, symTab);
+
+        // Create a temporary variable for the array element
+        char* tempVar = (char*)malloc(20 * sizeof(char));
+        sprintf(tempVar, "t%d", index);  // Use the index to reference the corresponding temp variable
+
+        return tempVar;  // Return the temp variable instead of referencing arr[index]
     } else if (expr->type == NodeType_Expr) {
         char* leftVar = generateExprTAC(expr->expr.left, symTab);
         char* rightVar = generateExprTAC(expr->expr.right, symTab);
@@ -78,7 +137,7 @@ char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
 
         char* tempVar = NULL;
 
-        // If one of the operands is float, promote the int to float
+        // Handle type promotion if necessary
         if (leftType == TYPE_INT && rightType == TYPE_FLOAT) {
             char* promotedLeft = generateTempFloatVar();
             generateTAC("CAST_TO_FLOAT", promotedLeft, leftVar, NULL);
@@ -95,6 +154,7 @@ char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
             tempVar = generateTempFloatVar();
         }
 
+        // Handle the operators
         if (strcmp(expr->expr.operator, "+") == 0) {
             generateTAC("ADD", tempVar, leftVar, rightVar);
         } else if (strcmp(expr->expr.operator, "-") == 0) {
@@ -102,12 +162,7 @@ char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
         } else if (strcmp(expr->expr.operator, "*") == 0) {
             generateTAC("MUL", tempVar, leftVar, rightVar);
         } else if (strcmp(expr->expr.operator, "/") == 0) {
-            if (rightType == TYPE_INT || rightType == TYPE_FLOAT) {
-                generateTAC("DIV", tempVar, leftVar, rightVar);
-            } else {
-                fprintf(stderr, "Semantic Error: Division by zero.\n");
-                exit(EXIT_FAILURE);
-            }
+            generateTAC("DIV", tempVar, leftVar, rightVar);
         }
 
         return tempVar;
@@ -116,26 +171,6 @@ char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
     return NULL;
 }
 
-
-void generateTAC(const char* operation, const char* result, const char* operand1, const char* operand2) {
-    TAC* newTAC = (TAC*)malloc(sizeof(TAC));
-    if (newTAC == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed for TAC.\n");
-        exit(EXIT_FAILURE);
-    }
-    newTAC->operation = strdup(operation);
-    newTAC->result = strdup(result);
-    newTAC->operand1 = operand1 ? strdup(operand1) : NULL;
-    newTAC->operand2 = operand2 ? strdup(operand2) : NULL;
-    newTAC->next = NULL;
-
-    if (tacTail == NULL) {
-        tacHead = newTAC;
-    } else {
-        tacTail->next = newTAC;
-    }
-    tacTail = newTAC;
-}
 
 SymbolType determineExprType(ASTNode* expr, SymbolTable* symTab) {
     if (!expr) return TYPE_UNKNOWN;
@@ -151,6 +186,15 @@ SymbolType determineExprType(ASTNode* expr, SymbolTable* symTab) {
                 return sym->type;  // Return the variable's type
             } else {
                 fprintf(stderr, "Semantic Error: Variable %s used before declaration.\n", expr->simpleID.name);
+                exit(EXIT_FAILURE);
+            }
+        }
+        case NodeType_ArrayAccess: {
+            Symbol* sym = lookupSymbol(symTab, expr->arrayAccess.arrayName);
+            if (sym) {
+                return sym->type;  // Return the array's type
+            } else {
+                fprintf(stderr, "Semantic Error: Array %s used before declaration.\n", expr->arrayAccess.arrayName);
                 exit(EXIT_FAILURE);
             }
         }
@@ -177,7 +221,12 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
             break;
 
         case NodeType_VarDecl:
-            printf("Adding variable '%s' of type '%s' to the symbol table.\n", node->varDecl.varName, node->varDecl.varType);
+            printf("Checking variable '%s' of type '%s'...\n", node->varDecl.varName, node->varDecl.varType);
+            break;
+
+        case NodeType_ArrayDecl:
+            printf("Checking array '%s' of type '%s' with size %d...\n", 
+                   node->arrayDecl.varName, node->arrayDecl.varType, node->arrayDecl.size);
             break;
 
         case NodeType_IntExpr:
@@ -198,14 +247,22 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
             break;
         }
 
+        case NodeType_ArrayAccess: {
+            printf("Checking array access for variable '%s'...\n", node->arrayAccess.arrayName);
+            Symbol* sym = lookupSymbol(symTab, node->arrayAccess.arrayName);
+            if (!sym) {
+                fprintf(stderr, "Semantic Error: Array '%s' used before declaration.\n", node->arrayAccess.arrayName);
+                exit(EXIT_FAILURE);
+            }
+            semanticCheck(node->arrayAccess.index, symTab);  // Check the index expression for validity
+            break;
+        }
+
         case NodeType_Expr: {
             printf("Checking expression with operator '%s'...\n", node->expr.operator);
-
-            // Recursively check left and right sides
-            semanticCheck(node->expr.left, symTab);
+            semanticCheck(node->expr.left, symTab);  // Recursively check left and right sides
             semanticCheck(node->expr.right, symTab);
 
-            // Type checking for binary operations
             SymbolType leftType = determineExprType(node->expr.left, symTab);
             SymbolType rightType = determineExprType(node->expr.right, symTab);
             if (leftType != rightType) {
@@ -239,7 +296,6 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
                 exit(EXIT_FAILURE);
             }
 
-            // Type checking for assignments
             SymbolType exprType = determineExprType(node->assignStmt.expr, symTab);
             if (sym->type != exprType) {
                 fprintf(stderr, "Semantic Error: Type mismatch in assignment to '%s'. Expected: %s, Found: %s.\n",
@@ -247,7 +303,7 @@ void semanticCheck(ASTNode* node, SymbolTable* symTab) {
                 exit(EXIT_FAILURE);
             }
 
-            semanticCheck(node->assignStmt.expr, symTab);
+            semanticCheck(node->assignStmt.expr, symTab);  // Check the assigned expression
             break;
         }
 

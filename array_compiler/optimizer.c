@@ -425,13 +425,25 @@ void replaceVariablesWithTemp(TAC** head) {
 
     while (current != NULL) {
         // Handle MOV operations involving variables or variable-to-variable assignments
-        if (strcmp(current->operation, "MOV") == 0 && (isVariable(current->result) && (isTemp(current->operand1) || isVariable(current->operand1)))) {
-            // If the operand is a variable, resolve it to its temp register or mapped variable
+        if (strcmp(current->operation, "MOV") == 0 && 
+            (isVariable(current->result) && (isTemp(current->operand1) || isVariable(current->operand1) || isArrayAccess(current->operand1)))) {
+            
+            // If the operand is a variable or an array access, resolve it to its temp register or mapped variable
             char* finalOperand = current->operand1;
-            for (int i = 0; i < mapIndex; i++) {
-                if (strcmp(finalOperand, variableMap[i][0]) == 0) {
-                    finalOperand = variableMap[i][1];  // Resolve to the mapped value
-                    break;
+
+            // Resolve array accesses as well
+            if (isArrayAccess(finalOperand)) {
+                // If it's an array access, resolve it to the corresponding temp variable if needed
+                char* tempVar = createTempVar(false); // Assuming arrays are of type int
+                TAC* newTAC = createTAC("MOV", tempVar, finalOperand, NULL, TYPE_INT);
+                appendTAC(&cleanedHead, newTAC);
+                finalOperand = tempVar; // Use the temporary variable
+            } else {
+                for (int i = 0; i < mapIndex; i++) {
+                    if (strcmp(finalOperand, variableMap[i][0]) == 0) {
+                        finalOperand = variableMap[i][1];  // Resolve to the mapped value
+                        break;
+                    }
                 }
             }
 
@@ -493,6 +505,11 @@ void replaceVariablesWithTemp(TAC** head) {
 
     // Update the original head to point to the cleaned TAC list
     *head = cleanedHead;
+}
+
+// Function to check if a string is an array access (e.g., arr[0])
+bool isArrayAccess(const char* str) {
+    return (str && strchr(str, '[') && strchr(str, ']'));
 }
 
 
