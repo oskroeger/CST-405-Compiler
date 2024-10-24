@@ -188,15 +188,6 @@ Stmt:
         printf("[DEBUG] Assigning value to %s[%d]: %d\n", $1->arrayAccess.arrayName, index, value); // Debug print
         sym->value.intArray[index] = value;  
 
-        // Assign the value to x if the index is 2
-        if (index == 2) {
-            Symbol* xSym = lookupSymbol(symTab, "x");
-            if (xSym != NULL) {
-                xSym->value.intValue = sym->value.intArray[index]; // Assign the value to x
-                printf("[DEBUG] Assigning value to x: %d\n", xSym->value.intValue); // Debug print
-            }
-        }
-
         // Generate TAC for the array assignment
         char* exprResult = generateExprTAC($3, symTab);
 
@@ -240,6 +231,14 @@ Stmt:
 
 ArrayAccess:
     ID LBRACKET Expr RBRACKET {
+        // Ensure the array is declared
+        Symbol* sym = lookupSymbol(symTab, $1);
+        if (sym == NULL) {
+            fprintf(stderr, "Error: Undeclared array '%s' used at line %d.\n", $1, yylineno);
+            parseErrorFlag = 1;
+            YYABORT;
+        }
+
         $$ = createNode(NodeType_ArrayAccess);
         $$->arrayAccess.arrayName = strdup($1);   // Store the array name
         $$->arrayAccess.index = $3;               // Store the index expression

@@ -55,7 +55,7 @@ void generateTAC(const char* operation, const char* result, const char* operand1
     // Preserve the first operand (e.g., t0, t1, etc.)
     newTAC->operand1 = operand1 ? strdup(operand1) : NULL;
 
-    // We don't need operand2 in the TAC if it's used for array indexing
+    // Preserve the second operand if it's not used for array indexing
     newTAC->operand2 = operand2 && !isdigit(operand2[0]) ? strdup(operand2) : NULL;
 
     newTAC->next = NULL;
@@ -68,7 +68,6 @@ void generateTAC(const char* operation, const char* result, const char* operand1
     }
     tacTail = newTAC;
 }
-
 
 
 void printTAC() {

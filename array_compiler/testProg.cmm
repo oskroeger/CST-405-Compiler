@@ -1,13 +1,11 @@
 int arr[5];
 int x;
-float y;
 
-arr[0] = 10;
-arr[1] = 20;
-arr[2] = arr[0] + arr[1];
+arr[0] = 4;
+arr[1] = 2;
+arr[2] = 3;
+arr[3] = 3;
 
-x = arr[2];
-y = 4.5 * 2.0;
+x = (arr[0] + arr[1]) / (arr[2] + arr[3]);
 
 write x;
-write y;

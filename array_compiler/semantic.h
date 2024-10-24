@@ -17,6 +17,7 @@ typedef struct TAC {
 extern TAC* tacHead;  // Head of the TAC linked list
 extern TAC* tacTail;  // Tail of the TAC linked list
 
+
 // Function prototypes for TAC generation and manipulation
 void generateTAC(const char* operation, const char* result, const char* operand1, const char* operand2);
 void printTAC();  // Prints the generated TAC
