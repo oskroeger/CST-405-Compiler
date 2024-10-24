@@ -312,16 +312,18 @@ bool isBinaryOperation(const char* operation) {
             strcmp(operation, "MUL") == 0 || strcmp(operation, "DIV") == 0);
 }
 
+
 // Helper function to renumber registers while preserving WRITE references
 void renumberRegisters(TAC** head) {
     TAC* current = *head;
     TAC* newHead = NULL;
     TAC* newTail = NULL;
 
-    // Map to track old registers to new register numbers (for both int and float)
-    char* registerMap[200] = {NULL};  // Adjust size as needed (100 for t and 100 for f)
-    int regTCounter = 0;              // Counter for integer temp registers (t0, t1, ...)
-    int regFCounter = 0;              // Counter for float temp registers (f0, f1, ...)
+    // Maps to track old registers to new register numbers for integers (t) and floats (f)
+    char* intRegisterMap[100] = {NULL};  // For integer registers (t0, t1, ...)
+    char* floatRegisterMap[100] = {NULL};  // For float registers (f0, f1, ...)
+    int intRegCounter = 0;  // Counter for integer temp registers
+    int floatRegCounter = 0;  // Counter for float temp registers
 
     // First Pass: Renumber MOV operations, ignoring WRITE
     while (current != NULL) {
@@ -329,37 +331,53 @@ void renumberRegisters(TAC** head) {
         char newOperand1[10] = "";
         char newOperand2[10] = "";
 
-        // Renumber result register and update the map
+        // Renumber result register and update the map based on register type (int or float)
         if (strcmp(current->operation, "MOV") == 0 && isTemp(current->result)) {
-            int index = (current->result[0] == 't' || current->result[0] == 'f') ? atoi(&current->result[1]) : -1;
+            int index = atoi(&current->result[1]);  // Get the register index number
 
-            // Renumber based on the type (int or float)
-            if (!registerMap[index]) {
-                if (current->result[0] == 't') {  // Integer temp register
-                    sprintf(newResult, "t%d", regTCounter++);
-                } else if (current->result[0] == 'f') {  // Float temp register
-                    sprintf(newResult, "f%d", regFCounter++);
+            if (current->result[0] == 't') {  // Integer register renumbering
+                if (!intRegisterMap[index]) {
+                    sprintf(newResult, "t%d", intRegCounter);
+                    intRegisterMap[index] = strdup(newResult);
+                    intRegCounter++;
+                } else {
+                    strcpy(newResult, intRegisterMap[index]);
                 }
-                registerMap[index] = strdup(newResult);
-            } else {
-                strcpy(newResult, registerMap[index]);
+            } else if (current->result[0] == 'f') {  // Float register renumbering
+                if (!floatRegisterMap[index]) {
+                    sprintf(newResult, "f%d", floatRegCounter);
+                    floatRegisterMap[index] = strdup(newResult);
+                    floatRegCounter++;
+                } else {
+                    strcpy(newResult, floatRegisterMap[index]);
+                }
             }
         } else {
             strcpy(newResult, current->result ? current->result : "");
         }
 
-        // Renumber operand1 register if it exists in the map
+        // Renumber operand1 register if it exists in the map based on its type
         if (current->operand1 && isTemp(current->operand1)) {
             int oldIndex = atoi(&current->operand1[1]);
-            strcpy(newOperand1, registerMap[oldIndex] ? registerMap[oldIndex] : current->operand1);
+
+            if (current->operand1[0] == 't') {  // Integer operand
+                strcpy(newOperand1, intRegisterMap[oldIndex] ? intRegisterMap[oldIndex] : current->operand1);
+            } else if (current->operand1[0] == 'f') {  // Float operand
+                strcpy(newOperand1, floatRegisterMap[oldIndex] ? floatRegisterMap[oldIndex] : current->operand1);
+            }
         } else {
             strcpy(newOperand1, current->operand1 ? current->operand1 : "");
         }
 
-        // Renumber operand2 register if it exists in the map
+        // Renumber operand2 register if it exists in the map based on its type
         if (current->operand2 && isTemp(current->operand2)) {
             int oldIndex = atoi(&current->operand2[1]);
-            strcpy(newOperand2, registerMap[oldIndex] ? registerMap[oldIndex] : current->operand2);
+
+            if (current->operand2[0] == 't') {  // Integer operand
+                strcpy(newOperand2, intRegisterMap[oldIndex] ? intRegisterMap[oldIndex] : current->operand2);
+            } else if (current->operand2[0] == 'f') {  // Float operand
+                strcpy(newOperand2, floatRegisterMap[oldIndex] ? floatRegisterMap[oldIndex] : current->operand2);
+            }
         } else {
             strcpy(newOperand2, current->operand2 ? current->operand2 : "");
         }
@@ -382,11 +400,13 @@ void renumberRegisters(TAC** head) {
     while (current != NULL) {
         if (strcmp(current->operation, "WRITE") == 0 && isTemp(current->result)) {
             int writeRegIndex = atoi(&current->result[1]);
-            if (registerMap[writeRegIndex]) {
-                // Apply the direct mapping from the register map without the redundant reference
-                strcpy(current->result, registerMap[writeRegIndex]);
-                current->operand1 = NULL;  // Remove redundant operand reference
+
+            if (current->result[0] == 't' && intRegisterMap[writeRegIndex]) {
+                strcpy(current->result, intRegisterMap[writeRegIndex]);
+            } else if (current->result[0] == 'f' && floatRegisterMap[writeRegIndex]) {
+                strcpy(current->result, floatRegisterMap[writeRegIndex]);
             }
+            current->operand1 = NULL;  // Remove redundant operand reference
         }
         current = current->next;
     }
@@ -405,10 +425,13 @@ void renumberRegisters(TAC** head) {
         temp = temp->next;
     }
 
-    // Clean up memory used by registerMap
-    for (int i = 0; i < 200; i++) {
-        if (registerMap[i]) {
-            free(registerMap[i]);
+    // Clean up memory used by register maps
+    for (int i = 0; i < 100; i++) {
+        if (intRegisterMap[i]) {
+            free(intRegisterMap[i]);
+        }
+        if (floatRegisterMap[i]) {
+            free(floatRegisterMap[i]);
         }
     }
 }
@@ -419,35 +442,36 @@ void replaceVariablesWithTemp(TAC** head) {
     TAC* cleanedHead = NULL;
     TAC* cleanedTail = NULL;
 
-    // Dictionary to map variables to their corresponding temp vars or other variables
+    // Dictionary to map variables (including arrays) to their corresponding temp vars or other variables
     char* variableMap[200][2]; // Adjust size to handle both int (t) and float (f) temp vars
     int mapIndex = 0;
 
     while (current != NULL) {
-        // Handle MOV operations involving variables or variable-to-variable assignments
+        // Handle MOV operations involving variables, arrays, or variable-to-variable assignments
         if (strcmp(current->operation, "MOV") == 0 && 
-            (isVariable(current->result) && (isTemp(current->operand1) || isVariable(current->operand1) || isArrayAccess(current->operand1)))) {
-            
-            // If the operand is a variable or an array access, resolve it to its temp register or mapped variable
+            (isVariable(current->result) || isArrayAccess(current->result)) && 
+            (isTemp(current->operand1) || isVariable(current->operand1) || isArrayAccess(current->operand1))) {
+
+            // Resolve the operand (it could be a variable or array access)
             char* finalOperand = current->operand1;
 
-            // Resolve array accesses as well
             if (isArrayAccess(finalOperand)) {
-                // If it's an array access, resolve it to the corresponding temp variable if needed
+                // If it's an array access, resolve it to a temp variable
                 char* tempVar = createTempVar(false); // Assuming arrays are of type int
                 TAC* newTAC = createTAC("MOV", tempVar, finalOperand, NULL, TYPE_INT);
                 appendTAC(&cleanedHead, newTAC);
-                finalOperand = tempVar; // Use the temporary variable
+                finalOperand = tempVar; // Use the temp variable from now on
             } else {
+                // If it's not an array access, resolve it to the mapped variable
                 for (int i = 0; i < mapIndex; i++) {
                     if (strcmp(finalOperand, variableMap[i][0]) == 0) {
-                        finalOperand = variableMap[i][1];  // Resolve to the mapped value
+                        finalOperand = variableMap[i][1];  // Resolve to mapped value
                         break;
                     }
                 }
             }
 
-            // Update the mapping of the variable to its corresponding temp var or resolved variable
+            // Update or create the mapping for the variable (or array)
             int found = 0;
             for (int i = 0; i < mapIndex; i++) {
                 if (strcmp(variableMap[i][0], current->result) == 0) {
@@ -458,10 +482,11 @@ void replaceVariablesWithTemp(TAC** head) {
                 }
             }
             if (!found) {
-                variableMap[mapIndex][0] = strdup(current->result);   // Variable name
-                variableMap[mapIndex][1] = strdup(finalOperand); // Corresponding temp var or resolved variable
+                variableMap[mapIndex][0] = strdup(current->result);   // Variable or array name
+                variableMap[mapIndex][1] = strdup(finalOperand); // Corresponding temp or resolved variable
                 mapIndex++;
             }
+
             current = current->next;
             continue;
         }
@@ -478,7 +503,7 @@ void replaceVariablesWithTemp(TAC** head) {
             }
         }
 
-        // Handle WRITE operations, ensuring correct referencing
+        // Handle WRITE operations by replacing variable names with temp vars
         if (strcmp(current->operation, "WRITE") == 0) {
             for (int i = 0; i < mapIndex; i++) {
                 if (current->result && strcmp(current->result, variableMap[i][0]) == 0) {
@@ -488,10 +513,10 @@ void replaceVariablesWithTemp(TAC** head) {
             }
         }
 
-        // Create a new TAC node with the proper type
+        // Create a new TAC node with the updated operands
         TAC* newTAC = createTAC(current->operation, current->result, operand1, operand2, current->type);
 
-        // Append to the cleaned list
+        // Append the new node to the cleaned list
         if (cleanedHead == NULL) {
             cleanedHead = newTAC;
             cleanedTail = newTAC;
@@ -506,6 +531,7 @@ void replaceVariablesWithTemp(TAC** head) {
     // Update the original head to point to the cleaned TAC list
     *head = cleanedHead;
 }
+
 
 // Function to check if a string is an array access (e.g., arr[0])
 bool isArrayAccess(const char* str) {
