@@ -3,7 +3,7 @@ newline: .asciiz "\n"
 .text
 .globl main
 main:
-    li $t0, 1
+    li $t0, 12
     move $a0, $t0
     li $v0, 1
     syscall

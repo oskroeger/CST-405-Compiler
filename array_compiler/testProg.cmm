@@ -1,11 +1,10 @@
 int arr[5];
+int arr2[5];
 int x;
 
-arr[0] = 4;
-arr[1] = 2;
-arr[2] = 3;
-arr[3] = 3;
+arr[0] = 5;
+arr2[0] = 4 + 3;
 
-x = (arr[0] + arr[1]) / (arr[2] + arr[3]);
+x = arr[0] + arr2[0];
 
 write x;

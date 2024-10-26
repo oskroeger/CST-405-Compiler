@@ -39,24 +39,19 @@ void generateTAC(const char* operation, const char* result, const char* operand1
         exit(EXIT_FAILURE);
     }
 
-    // Handle array access by incorporating the index into the result variable
-    if (result && operand2 && isdigit(operand2[0])) {
-        char tempResult[50];
-        sprintf(tempResult, "%s[%s]", result, operand2);  // Format as arr[index]
-        newTAC->result = strdup(tempResult);
-        
-        // Ensure the operation is MOV before assigning to the array
-        newTAC->operation = strdup("MOV");
+    // Check if the result is an array access and format it accordingly
+    if (result && strchr(result, '[')) {
+        // Array assignment: Use the array access (e.g., arr[0])
+        newTAC->result = strdup(result);
     } else {
         newTAC->result = result ? strdup(result) : NULL;
-        newTAC->operation = strdup(operation);  // Preserve other operations like ADD, MUL, etc.
     }
 
-    // Preserve the first operand (e.g., t0, t1, etc.)
-    newTAC->operand1 = operand1 ? strdup(operand1) : NULL;
+    newTAC->operation = strdup(operation);
 
-    // Preserve the second operand if it's not used for array indexing
-    newTAC->operand2 = operand2 && !isdigit(operand2[0]) ? strdup(operand2) : NULL;
+    // Set operand1 and operand2 (if provided)
+    newTAC->operand1 = operand1 ? strdup(operand1) : NULL;
+    newTAC->operand2 = operand2 ? strdup(operand2) : NULL;
 
     newTAC->next = NULL;
 
@@ -89,7 +84,6 @@ void printTAC() {
 }
 
 
-
 char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
     if (expr->type == NodeType_IntExpr) {
         char* tempVar = generateTempIntVar();
@@ -106,27 +100,34 @@ char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {
     } else if (expr->type == NodeType_SimpleID) {
         Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
         if (sym != NULL) {
-            return sym->name;
+            return sym->name;  // Return the variable name
         } else {
             fprintf(stderr, "Error: Variable %s used before declaration.\n", expr->simpleID.name);
             exit(EXIT_FAILURE);
         }
     } else if (expr->type == NodeType_ArrayAccess) {
-        // Handle array access and map it to the temp variable holding the value
+        // Lookup the array in the symbol table
         Symbol* sym = lookupSymbol(symTab, expr->arrayAccess.arrayName);
         if (sym == NULL) {
             fprintf(stderr, "Error: Array %s used before declaration.\n", expr->arrayAccess.arrayName);
             exit(EXIT_FAILURE);
         }
 
-        // Evaluate the index and generate the TAC to load the value
-        int index = (int)evaluateExpr(expr->arrayAccess.index, symTab);
+        // Check if the index is a constant integer expression
+        char* indexStr;
+        if (expr->arrayAccess.index->type == NodeType_IntExpr) {
+            // If the index is a constant integer, use it directly
+            indexStr = (char*)malloc(10 * sizeof(char));
+            sprintf(indexStr, "%d", expr->arrayAccess.index->IntExpr.integer);  // Directly use the constant index
+        } else {
+            // Otherwise, evaluate the index expression (if it's a variable or more complex expression)
+            indexStr = generateExprTAC(expr->arrayAccess.index, symTab);
+        }
 
-        // Create a temporary variable for the array element
-        char* tempVar = (char*)malloc(20 * sizeof(char));
-        sprintf(tempVar, "t%d", index);  // Use the index to reference the corresponding temp variable
-
-        return tempVar;  // Return the temp variable instead of referencing arr[index]
+        // Return the array element reference directly, e.g., "arr[0]" or "arr[i]"
+        char* arrayAccessStr = (char*)malloc(50 * sizeof(char));
+        sprintf(arrayAccessStr, "%s[%s]", sym->name, indexStr);  // Format the array access as "arr[index]"
+        return arrayAccessStr;  // Return the array access as a reference for use in TAC
     } else if (expr->type == NodeType_Expr) {
         char* leftVar = generateExprTAC(expr->expr.left, symTab);
         char* rightVar = generateExprTAC(expr->expr.right, symTab);

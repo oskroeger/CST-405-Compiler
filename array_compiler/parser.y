@@ -165,7 +165,7 @@ Stmt:
         printf("[INFO] Assignment statement recognized: %s = ...;\n", $1);
     }
     | ArrayAccess EQ Expr SEMICOLON {
-        printf("[DEBUG] Array assignment detected: %s[index] = Expr\n", $1->arrayAccess.arrayName); // Debug print
+        printf("[DEBUG] Array assignment detected: %s = Expr\n", $1->arrayAccess.arrayName);
 
         Symbol* sym = lookupSymbol(symTab, $1->arrayAccess.arrayName);
         if (sym == NULL) {
@@ -174,36 +174,21 @@ Stmt:
             YYABORT;
         }
 
-        int index = (int)evaluateExpr($1->arrayAccess.index, symTab);  // Evaluate index expression
-        printf("[DEBUG] Array index evaluated: %d\n", index); // Debug print for index value
-
-        if (index < 0 || index >= sym->size) {
-            fprintf(stderr, "Error: Array index out of bounds for array '%s' at line %d.\n", $1->arrayAccess.arrayName, yylineno);
-            parseErrorFlag = 1;
-            YYABORT;
-        }
-
-        // Evaluate the value to be assigned
-        int value = (int)evaluateExpr($3, symTab); // Get the value to assign
-        printf("[DEBUG] Assigning value to %s[%d]: %d\n", $1->arrayAccess.arrayName, index, value); // Debug print
-        sym->value.intArray[index] = value;  
-
         // Generate TAC for the array assignment
         char* exprResult = generateExprTAC($3, symTab);
-
-        // Create a temporary variable to hold the index as a string
         char indexStr[10];
-        sprintf(indexStr, "%d", index);  // Convert the index to string
+        sprintf(indexStr, "%d", (int)evaluateExpr($1->arrayAccess.index, symTab));  // Convert the index to a string
+        char arrayAccessStr[50];
+        sprintf(arrayAccessStr, "%s[%s]", $1->arrayAccess.arrayName, indexStr);  // Format the array access as "arr[0]"
 
-        // Pass the name of the array and the index as a string
-        generateTAC("MOV", sym->name, exprResult, indexStr); 
+        generateTAC("MOV", arrayAccessStr, exprResult, NULL);  // Pass "arr[0]" directly
 
         $$ = createNode(NodeType_AssignStmt);
         $$->assignStmt.varName = strdup($1->arrayAccess.arrayName);
         $$->assignStmt.operator = strdup($2);
         $$->assignStmt.expr = $3;
 
-        printf("[INFO] Array assignment recognized: %s[%d] = ...;\n", $1->arrayAccess.arrayName, index);
+        printf("[INFO] Array assignment recognized: %s[%s] = ...;\n", $1->arrayAccess.arrayName, indexStr);
     }
     | WRITE Expr SEMICOLON {
         $$ = createNode(NodeType_WriteStmt);
@@ -231,7 +216,7 @@ Stmt:
 
 ArrayAccess:
     ID LBRACKET Expr RBRACKET {
-        // Ensure the array is declared
+        // Lookup the array in the symbol table
         Symbol* sym = lookupSymbol(symTab, $1);
         if (sym == NULL) {
             fprintf(stderr, "Error: Undeclared array '%s' used at line %d.\n", $1, yylineno);
