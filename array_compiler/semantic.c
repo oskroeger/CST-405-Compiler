@@ -70,11 +70,22 @@ void printTAC() {
     while (current != NULL) {
         if (current->operand2) {
             // For binary operations like ADD, SUB, etc.
-            printf("%s = %s %s %s\n", current->result, current->operand1, current->operation, current->operand2);
+            if (isFloatOperand(current->operand1) || isFloatOperand(current->operand2)) {
+                // Handle float formatting for binary operations
+                printf("%s = %.4f %s %.4f\n", current->result, atof(current->operand1), current->operation, atof(current->operand2));
+            } else {
+                // Regular integer or non-float operations
+                printf("%s = %s %s %s\n", current->result, current->operand1, current->operation, current->operand2);
+            }
         } else if (current->operand1) {
             // For unary operations like MOV
-            // Always include the operation even for array accesses
-            printf("%s = %s %s\n", current->result, current->operation, current->operand1);
+            if (isFloatOperand(current->operand1)) {
+                // Handle float formatting for unary operations
+                printf("%s = %s %.4f\n", current->result, current->operation, atof(current->operand1));
+            } else {
+                // Regular integer or non-float operations
+                printf("%s = %s %s\n", current->result, current->operation, current->operand1);
+            }
         } else {
             // For operations that only involve the result (like return statements)
             printf("%s = %s\n", current->result, current->operation);
@@ -82,6 +93,13 @@ void printTAC() {
         current = current->next;
     }
 }
+
+// Helper function to determine if an operand is a float
+int isFloatOperand(char* operand) {
+    // Simple check: if it contains a '.', it could be a float (basic assumption)
+    return strchr(operand, '.') != NULL;
+}
+
 
 
 char* generateExprTAC(ASTNode* expr, SymbolTable* symTab) {

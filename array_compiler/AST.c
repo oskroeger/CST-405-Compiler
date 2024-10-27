@@ -213,11 +213,14 @@ float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
     } else if (expr->type == NodeType_FloatExpr) {
         return expr->FloatExpr.floatNum;
     } else if (expr->type == NodeType_SimpleID) {
+        // Handle simple variable access (int or float)
         Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
         if (sym != NULL) {
             if (sym->type == TYPE_INT && sym->value.intValue != INT_MIN) {
+                printf("[DEBUG] Simple ID '%s' evaluated to %d\n", sym->name, sym->value.intValue);
                 return (float) sym->value.intValue;
             } else if (sym->type == TYPE_FLOAT && sym->value.floatValue != FLT_MIN) {
+                printf("[DEBUG] Simple ID '%s' evaluated to %f\n", sym->name, sym->value.floatValue);
                 return sym->value.floatValue;
             } else {
                 fprintf(stderr, "Error: Variable '%s' used before being defined.\n", expr->simpleID.name);
@@ -228,14 +231,18 @@ float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
             exit(EXIT_FAILURE);
         }
     } else if (expr->type == NodeType_ArrayAccess) {
+        // Handle array access (int or float arrays)
         Symbol* sym = lookupSymbol(symTab, expr->arrayAccess.arrayName);
         if (sym != NULL) {
-            int index = (int)evaluateExpr(expr->arrayAccess.index, symTab);
+            int index = (int)evaluateExpr(expr->arrayAccess.index, symTab);  // Recursively evaluate index expression
             if (index >= 0 && index < sym->size) {
+                // Check for int or float array types
                 if (sym->type == TYPE_INT) {
-                    return (float)sym->value.intArray[index]; // Return the value of the array element
+                    printf("[DEBUG] Array '%s' index %d evaluated to %d\n", sym->name, index, sym->value.intArray[index]);
+                    return (float)sym->value.intArray[index]; // Return the value of the int array element
                 } else if (sym->type == TYPE_FLOAT) {
-                    return (float)sym->value.floatArray[index]; // Return the value of the array element
+                    printf("[DEBUG] Array '%s' index %d evaluated to %f\n", sym->name, index, sym->value.floatArray[index]);
+                    return sym->value.floatArray[index]; // Return the value of the float array element
                 }
             } else {
                 fprintf(stderr, "Error: Array index %d out of bounds for array '%s'.\n", index, expr->arrayAccess.arrayName);
@@ -246,25 +253,33 @@ float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
             exit(EXIT_FAILURE);
         }
     } else if (expr->type == NodeType_Expr) {
-        float leftVal = evaluateExpr(expr->expr.left, symTab);
-        float rightVal = evaluateExpr(expr->expr.right, symTab);
+        // Handle binary expressions (+, -, *, /)
+        float leftVal = evaluateExpr(expr->expr.left, symTab);  // Recursively evaluate left expression
+        float rightVal = evaluateExpr(expr->expr.right, symTab); // Recursively evaluate right expression
 
+        // Apply the operator to the evaluated left and right values
         if (strcmp(expr->expr.operator, "+") == 0) {
+            printf("[DEBUG] Expression evaluated: %f + %f\n", leftVal, rightVal);
             return leftVal + rightVal;
         } else if (strcmp(expr->expr.operator, "-") == 0) {
+            printf("[DEBUG] Expression evaluated: %f - %f\n", leftVal, rightVal);
             return leftVal - rightVal;
         } else if (strcmp(expr->expr.operator, "*") == 0) {
+            printf("[DEBUG] Expression evaluated: %f * %f\n", leftVal, rightVal);
             return leftVal * rightVal;
         } else if (strcmp(expr->expr.operator, "/") == 0) {
             if (rightVal == 0) {
                 fprintf(stderr, "Error: Division by zero.\n");
                 exit(EXIT_FAILURE);
             }
+            printf("[DEBUG] Expression evaluated: %f / %f\n", leftVal, rightVal);
             return leftVal / rightVal;
         } else {
             fprintf(stderr, "Error: Unsupported operator '%s'.\n", expr->expr.operator);
             exit(EXIT_FAILURE);
         }
     }
+
+    // Return 0.0 if no valid expression type was matched (fail-safe)
     return 0.0;
 }

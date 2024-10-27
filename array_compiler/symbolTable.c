@@ -30,7 +30,7 @@ unsigned int hash(SymbolTable* table, char* name) {
     return hashval % table->size;
 }
 
-// Function to add a symbol to the table
+// Function to add a symbol to the table (for regular variables)
 void addSymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue value) {
     if (table == NULL || table->table == NULL) {
         fprintf(stderr, "Symbol table or table array not initialized\n");
@@ -63,8 +63,14 @@ void addSymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue valu
 
     newSymbol->name = strdup(name);
     newSymbol->type = type;
-    newSymbol->value = value;
     newSymbol->size = 0;  // Default size for non-array symbols
+
+    if (type == TYPE_INT) {
+        newSymbol->value.intValue = value.intValue;
+    } else if (type == TYPE_FLOAT) {
+        newSymbol->value.floatValue = value.floatValue;
+    }
+
     newSymbol->next = table->table[hashval];
     table->table[hashval] = newSymbol;
 }
@@ -81,7 +87,7 @@ void addArraySymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue
     // Check for an existing symbol with the same name
     for (Symbol* sym = table->table[hashval]; sym != NULL; sym = sym->next) {
         if (strcmp(name, sym->name) == 0) {
-            // Update existing array symbol's type and value
+            // Update existing array symbol's type, value, and size
             sym->type = type;
             sym->size = size;
             if (type == TYPE_INT) {
@@ -99,8 +105,20 @@ void addArraySymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue
 
     newSymbol->name = strdup(name);
     newSymbol->type = type;
-    newSymbol->value = value;
     newSymbol->size = size;  // Store the array size
+
+    if (type == TYPE_INT) {
+        newSymbol->value.intArray = (int*)malloc(size * sizeof(int));
+        for (int i = 0; i < size; i++) {
+            newSymbol->value.intArray[i] = 0;  // Initialize all elements to 0
+        }
+    } else if (type == TYPE_FLOAT) {
+        newSymbol->value.floatArray = (float*)malloc(size * sizeof(float));
+        for (int i = 0; i < size; i++) {
+            newSymbol->value.floatArray[i] = 0.0;  // Initialize all elements to 0.0
+        }
+    }
+
     newSymbol->next = table->table[hashval];
     table->table[hashval] = newSymbol;
 }
@@ -144,13 +162,22 @@ void printSymbolTable(const SymbolTable* table) {
         while (sym != NULL) {
             if (sym->size > 0) {  // Check if it's an array
                 printf("Name: %s | Type: %s | Array Size: %d\n", sym->name, symbolTypeToString(sym->type), sym->size);
+                if (sym->type == TYPE_INT) {
+                    for (int j = 0; j < sym->size; j++) {
+                        printf("\tIndex %d: %d\n", j, sym->value.intArray[j]);
+                    }
+                } else if (sym->type == TYPE_FLOAT) {
+                    for (int j = 0; j < sym->size; j++) {
+                        printf("\tIndex %d: %.4f\n", j, sym->value.floatArray[j]);  // Format floats to 4 decimal places
+                    }
+                }
             } else {
                 switch (sym->type) {
                     case TYPE_INT:
                         printf("Name: %s | Type: INT | Value: %d\n", sym->name, sym->value.intValue);
                         break;
                     case TYPE_FLOAT:
-                        printf("Name: %s | Type: FLOAT | Value: %f\n", sym->name, sym->value.floatValue);
+                        printf("Name: %s | Type: FLOAT | Value: %.4f\n", sym->name, sym->value.floatValue);  // Format float to 4 decimal places
                         break;
                     case TYPE_CHAR:
                         printf("Name: %s | Type: CHAR | Value: %c\n", sym->name, sym->value.charValue);
@@ -166,6 +193,7 @@ void printSymbolTable(const SymbolTable* table) {
     }
     printf("------------------------\n");
 }
+
 
 // Helper function to convert SymbolType to a string
 const char* symbolTypeToString(SymbolType type) {

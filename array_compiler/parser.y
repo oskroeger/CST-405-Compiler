@@ -165,7 +165,7 @@ Stmt:
         printf("[INFO] Assignment statement recognized: %s = ...;\n", $1);
     }
     | ArrayAccess EQ Expr SEMICOLON {
-        printf("[DEBUG] Array assignment detected: %s = Expr\n", $1->arrayAccess.arrayName);
+        printf("[DEBUG] Array assignment detected: %s[index] = Expr\n", $1->arrayAccess.arrayName); // Debug print
 
         Symbol* sym = lookupSymbol(symTab, $1->arrayAccess.arrayName);
         if (sym == NULL) {
@@ -174,23 +174,43 @@ Stmt:
             YYABORT;
         }
 
+        int index = (int)evaluateExpr($1->arrayAccess.index, symTab);  // Evaluate index expression
+        printf("[DEBUG] Array index evaluated: %d\n", index); // Debug print for index value
+
+        if (index < 0 || index >= sym->size) {
+            fprintf(stderr, "Error: Array index out of bounds for array '%s' at line %d.\n", $1->arrayAccess.arrayName, yylineno);
+            parseErrorFlag = 1;
+            YYABORT;
+        }
+
+        // Evaluate the value to be assigned and store in the array based on its type
+        if (sym->type == TYPE_INT) {
+            int value = (int)evaluateExpr($3, symTab); // Evaluate and cast to int for int arrays
+            printf("[DEBUG] Assigning int value to %s[%d]: %d\n", $1->arrayAccess.arrayName, index, value); // Debug print
+            sym->value.intArray[index] = value;  // Store in the int array
+        } else if (sym->type == TYPE_FLOAT) {
+            float value = evaluateExpr($3, symTab); // Evaluate as float for float arrays
+            printf("[DEBUG] Assigning float value to %s[%d]: %f\n", $1->arrayAccess.arrayName, index, value); // Debug print
+            sym->value.floatArray[index] = value;  // Store in the float array
+        }
+
         // Generate TAC for the array assignment
         char* exprResult = generateExprTAC($3, symTab);
-        char indexStr[10];
-        sprintf(indexStr, "%d", (int)evaluateExpr($1->arrayAccess.index, symTab));  // Convert the index to a string
-        char arrayAccessStr[50];
-        sprintf(arrayAccessStr, "%s[%s]", $1->arrayAccess.arrayName, indexStr);  // Format the array access as "arr[0]"
 
-        generateTAC("MOV", arrayAccessStr, exprResult, NULL);  // Pass "arr[0]" directly
+        // Generate TAC with the array name and index
+        char arrayAccessStr[50];
+        sprintf(arrayAccessStr, "%s[%d]", $1->arrayAccess.arrayName, index);  // Create string "arr[0]" format
+
+        // Use the array access string directly for TAC generation
+        generateTAC("MOV", arrayAccessStr, exprResult, NULL);
 
         $$ = createNode(NodeType_AssignStmt);
         $$->assignStmt.varName = strdup($1->arrayAccess.arrayName);
         $$->assignStmt.operator = strdup($2);
         $$->assignStmt.expr = $3;
 
-        printf("[INFO] Array assignment recognized: %s[%s] = ...;\n", $1->arrayAccess.arrayName, indexStr);
-    }
-    | WRITE Expr SEMICOLON {
+        printf("[INFO] Array assignment recognized: %s[%d] = ...;\n", $1->arrayAccess.arrayName, index);
+    } | WRITE Expr SEMICOLON {
         $$ = createNode(NodeType_WriteStmt);
         char* id = NULL;
 
@@ -334,7 +354,7 @@ int main() {
 
         // Step 1: Clean the TAC by replacing variable references with temp vars
         printf("\n----- CLEANED TAC -----\n");
-        replaceVariablesWithTemp(&tacHead);
+        replaceVariablesWithTemp(&tacHead, symTab);
         printTAC();
 
         // Step 2: Optimize the cleaned-up TAC

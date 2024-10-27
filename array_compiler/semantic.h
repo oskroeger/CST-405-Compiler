@@ -21,6 +21,7 @@ extern TAC* tacTail;  // Tail of the TAC linked list
 // Function prototypes for TAC generation and manipulation
 void generateTAC(const char* operation, const char* result, const char* operand1, const char* operand2);
 void printTAC();  // Prints the generated TAC
+int isFloatOperand(char* operand);
 
 // Temporary variable generation for different types
 char* generateTempIntVar();   // Generate a temporary variable for int expressions

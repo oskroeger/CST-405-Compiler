@@ -21,7 +21,7 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead);
 // Helper functions
 bool isBinaryOperation(const char* operation);
 void renumberRegisters(TAC** head);
-void replaceVariablesWithTemp(TAC** head);
+void replaceVariablesWithTemp(TAC** head, SymbolTable* symTab);
 bool isArrayAccess(const char* str);
 bool isVariable(const char* str);
 bool isTemp(const char* str);
@@ -33,5 +33,8 @@ char* createTempVar(bool isFloat);
 
 // Function to safely append TAC instructions to the linked list
 void appendTAC(TAC** head, TAC* newInstruction);
+
+char* getArrayName(const char* arrayAccessStr);
+void printCurrentTAC(TAC* currentHead);
 
 #endif // OPTIMIZER_H

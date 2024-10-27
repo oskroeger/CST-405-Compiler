@@ -33,7 +33,9 @@ void generateMIPS(TAC* tacHead) {
                 if (firstChar == 't') {  // Integer temp var
                     fprintf(file, "    li $%s, %s\n", current->result, current->operand1); // Load immediate integer
                 } else if (firstChar == 'f') {  // Float temp var
-                    fprintf(file, "    li.s $f%s, %s\n", current->result + 1, current->operand1); // Load immediate float
+                    // Format the float to 4 decimal places
+                    float floatVal = atof(current->operand1);
+                    fprintf(file, "    li.s $f%s, %.4f\n", current->result + 1, floatVal); // Load immediate float
                 }
             } else {
                 if (firstChar == 't') {  // Integer temp var

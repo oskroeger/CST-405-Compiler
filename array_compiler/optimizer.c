@@ -1,5 +1,6 @@
 #include "optimizer.h"
 #include "semantic.h"
+#include "symbolTable.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +43,7 @@ void optimizeTAC(TAC** head) {
     // Update the original head to point to the fully optimized TAC
     *head = finalOptimizedHead;
 }
+
 
 void constantFolding(TAC** head, TAC** optimizedHead) {
     TAC* current = *head;
@@ -141,16 +143,9 @@ void constantFolding(TAC** head, TAC** optimizedHead) {
         current = current->next;
     }
 
-    // Print the TAC after constant folding for debugging
+    // After folding, print the optimized TAC
     printf("\n----- TAC After Constant Folding -----\n");
-    TAC* printCurrent = *optimizedHead;
-    while (printCurrent != NULL) {
-        printf("%s = %s %s %s\n", printCurrent->result, 
-               printCurrent->operand1 ? printCurrent->operand1 : "", 
-               printCurrent->operation, 
-               printCurrent->operand2 ? printCurrent->operand2 : "");
-        printCurrent = printCurrent->next;
-    }
+    printCurrentTAC(*optimizedHead);  // Use printTAC to print the updated TAC
 }
 
 
@@ -194,21 +189,7 @@ void copyPropagation(TAC** head, TAC** optimizedHead) {
 
     // Print the TAC after copy propagation for verification
     printf("\n----- TAC After Copy Propagation -----\n");
-    TAC* temp = *optimizedHead;
-    while (temp != NULL) {
-        printf("%s = %s %s %s\n", temp->result, 
-               temp->operand1 ? temp->operand1 : "", 
-               temp->operation, 
-               temp->operand2 ? temp->operand2 : "");
-        temp = temp->next;
-    }
-
-    // Clean up copyMap to free allocated memory
-    for (int i = 0; i < 100; i++) {
-        if (copyMap[i]) {
-            free(copyMap[i]);
-        }
-    }
+    printCurrentTAC(*optimizedHead);
 }
 
 
@@ -297,13 +278,8 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead) {
 
     // Print final TAC after dead code elimination
     printf("\n----- TAC After Dead Code Elimination -----\n");
-    TAC* temp = *optimizedHead;
-    while (temp != NULL) {
-        printf("%s = %s %s %s\n", temp->result, temp->operand1, temp->operation, temp->operand2 ? temp->operand2 : "");
-        temp = temp->next;
-    }
+    printCurrentTAC(*optimizedHead);
 }
-
 
 
 // Helper function to check if an operation is a binary arithmetic operation
@@ -437,7 +413,7 @@ void renumberRegisters(TAC** head) {
 }
 
 
-void replaceVariablesWithTemp(TAC** head) {
+void replaceVariablesWithTemp(TAC** head, SymbolTable* symTab) {
     TAC* current = *head;
     TAC* cleanedHead = NULL;
     TAC* cleanedTail = NULL;
@@ -455,10 +431,17 @@ void replaceVariablesWithTemp(TAC** head) {
             // Resolve the operand (it could be a variable or array access)
             char* finalOperand = current->operand1;
 
+            // If it's an array access, resolve it to a temp variable with the correct type
             if (isArrayAccess(finalOperand)) {
-                // If it's an array access, resolve it to a temp variable
-                char* tempVar = createTempVar(false); // Assuming arrays are of type int
-                TAC* newTAC = createTAC("MOV", tempVar, finalOperand, NULL, TYPE_INT);
+                char* arrayName = getArrayName(finalOperand);  // Extract the array name from the access
+                Symbol* sym = lookupSymbol(symTab, arrayName); // Get array from symbol table
+                free(arrayName);  // Free the temporary array name string
+                
+                SymbolType arrayType = sym->type;  // Get array type from the symbol table
+
+                // Create a temp variable of the appropriate type (int or float)
+                char* tempVar = createTempVar(arrayType == TYPE_FLOAT);
+                TAC* newTAC = createTAC("MOV", tempVar, finalOperand, NULL, arrayType);
                 appendTAC(&cleanedHead, newTAC);
                 finalOperand = tempVar; // Use the temp variable from now on
             } else {
@@ -626,5 +609,46 @@ void appendTAC(TAC** head, TAC* newInstruction) {
             current = current->next;
         }
         current->next = newInstruction;
+    }
+}
+
+
+char* getArrayName(const char* arrayAccessStr) {
+    // Copy the string since strtok modifies the original
+    char* arrayAccessCopy = strdup(arrayAccessStr);
+    char* arrayName = strtok(arrayAccessCopy, "["); // Split by "[" to get the array name
+    char* result = strdup(arrayName);  // Copy the result so we don't lose it after free
+    free(arrayAccessCopy); // Free the temporary copy
+    return result;
+}
+
+
+// Function to print the TAC from a given head (for optimizations without resetting the global head)
+void printCurrentTAC(TAC* currentHead) {
+    TAC* current = currentHead;
+    while (current != NULL) {
+        if (current->operand2) {
+            // For binary operations like ADD, SUB, etc.
+            if (isFloatOperand(current->operand1) || isFloatOperand(current->operand2)) {
+                // Handle float formatting for binary operations
+                printf("%s = %.4f %s %.4f\n", current->result, atof(current->operand1), current->operation, atof(current->operand2));
+            } else {
+                // Regular integer or non-float operations
+                printf("%s = %s %s %s\n", current->result, current->operand1, current->operation, current->operand2);
+            }
+        } else if (current->operand1) {
+            // For unary operations like MOV
+            if (isFloatOperand(current->operand1)) {
+                // Handle float formatting for unary operations
+                printf("%s = %s %.4f\n", current->result, current->operation, atof(current->operand1));
+            } else {
+                // Regular integer or non-float operations
+                printf("%s = %s %s\n", current->result, current->operation, current->operand1);
+            }
+        } else {
+            // For operations that only involve the result (like return statements)
+            printf("%s = %s\n", current->result, current->operation);
+        }
+        current = current->next;
     }
 }
