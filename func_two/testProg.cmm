@@ -1,0 +1,9 @@
+function greet() {
+    write 42;
+}
+
+function main() {
+    greet();
+}
+
+main();
