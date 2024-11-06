@@ -54,26 +54,27 @@ extern int yydebug;
     YYEOF = 0,                     /* "end of file"  */
     YYerror = 256,                 /* error  */
     YYUNDEF = 257,                 /* "invalid token"  */
-    TYPE = 258,                    /* TYPE  */
-    ID = 259,                      /* ID  */
-    SEMICOLON = 260,               /* SEMICOLON  */
-    EQ = 261,                      /* EQ  */
-    PLUS = 262,                    /* PLUS  */
-    MINUS = 263,                   /* MINUS  */
-    MULTIPLY = 264,                /* MULTIPLY  */
-    DIVIDE = 265,                  /* DIVIDE  */
-    INTEGER = 266,                 /* INTEGER  */
-    FLOAT = 267,                   /* FLOAT  */
-    WRITE = 268,                   /* WRITE  */
-    LPAREN = 269,                  /* LPAREN  */
-    RPAREN = 270,                  /* RPAREN  */
-    LBRACKET = 271,                /* LBRACKET  */
-    RBRACKET = 272,                /* RBRACKET  */
-    FUNCTION = 273,                /* FUNCTION  */
-    RETURN = 274,                  /* RETURN  */
+    FUNCTION = 258,                /* FUNCTION  */
+    RETURN = 259,                  /* RETURN  */
+    TYPE = 260,                    /* TYPE  */
+    ID = 261,                      /* ID  */
+    SEMICOLON = 262,               /* SEMICOLON  */
+    EQ = 263,                      /* EQ  */
+    PLUS = 264,                    /* PLUS  */
+    MINUS = 265,                   /* MINUS  */
+    MULTIPLY = 266,                /* MULTIPLY  */
+    DIVIDE = 267,                  /* DIVIDE  */
+    INTEGER = 268,                 /* INTEGER  */
+    FLOAT = 269,                   /* FLOAT  */
+    WRITE = 270,                   /* WRITE  */
+    LPAREN = 271,                  /* LPAREN  */
+    RPAREN = 272,                  /* RPAREN  */
+    LBRACKET = 273,                /* LBRACKET  */
+    RBRACKET = 274,                /* RBRACKET  */
     LBRACE = 275,                  /* LBRACE  */
     RBRACE = 276,                  /* RBRACE  */
-    UNRECOGNIZED = 277             /* UNRECOGNIZED  */
+    COMMA = 277,                   /* COMMA  */
+    UNRECOGNIZED = 278             /* UNRECOGNIZED  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -91,7 +92,7 @@ union YYSTYPE
     char* operator;
     struct ASTNode* ast;
 
-#line 95 "parser.tab.h"
+#line 96 "parser.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

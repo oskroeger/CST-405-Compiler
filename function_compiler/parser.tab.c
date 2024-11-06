@@ -127,36 +127,41 @@ enum yysymbol_kind_t
   YYSYMBOL_YYEOF = 0,                      /* "end of file"  */
   YYSYMBOL_YYerror = 1,                    /* error  */
   YYSYMBOL_YYUNDEF = 2,                    /* "invalid token"  */
-  YYSYMBOL_TYPE = 3,                       /* TYPE  */
-  YYSYMBOL_ID = 4,                         /* ID  */
-  YYSYMBOL_SEMICOLON = 5,                  /* SEMICOLON  */
-  YYSYMBOL_EQ = 6,                         /* EQ  */
-  YYSYMBOL_PLUS = 7,                       /* PLUS  */
-  YYSYMBOL_MINUS = 8,                      /* MINUS  */
-  YYSYMBOL_MULTIPLY = 9,                   /* MULTIPLY  */
-  YYSYMBOL_DIVIDE = 10,                    /* DIVIDE  */
-  YYSYMBOL_INTEGER = 11,                   /* INTEGER  */
-  YYSYMBOL_FLOAT = 12,                     /* FLOAT  */
-  YYSYMBOL_WRITE = 13,                     /* WRITE  */
-  YYSYMBOL_LPAREN = 14,                    /* LPAREN  */
-  YYSYMBOL_RPAREN = 15,                    /* RPAREN  */
-  YYSYMBOL_LBRACKET = 16,                  /* LBRACKET  */
-  YYSYMBOL_RBRACKET = 17,                  /* RBRACKET  */
-  YYSYMBOL_FUNCTION = 18,                  /* FUNCTION  */
-  YYSYMBOL_RETURN = 19,                    /* RETURN  */
+  YYSYMBOL_FUNCTION = 3,                   /* FUNCTION  */
+  YYSYMBOL_RETURN = 4,                     /* RETURN  */
+  YYSYMBOL_TYPE = 5,                       /* TYPE  */
+  YYSYMBOL_ID = 6,                         /* ID  */
+  YYSYMBOL_SEMICOLON = 7,                  /* SEMICOLON  */
+  YYSYMBOL_EQ = 8,                         /* EQ  */
+  YYSYMBOL_PLUS = 9,                       /* PLUS  */
+  YYSYMBOL_MINUS = 10,                     /* MINUS  */
+  YYSYMBOL_MULTIPLY = 11,                  /* MULTIPLY  */
+  YYSYMBOL_DIVIDE = 12,                    /* DIVIDE  */
+  YYSYMBOL_INTEGER = 13,                   /* INTEGER  */
+  YYSYMBOL_FLOAT = 14,                     /* FLOAT  */
+  YYSYMBOL_WRITE = 15,                     /* WRITE  */
+  YYSYMBOL_LPAREN = 16,                    /* LPAREN  */
+  YYSYMBOL_RPAREN = 17,                    /* RPAREN  */
+  YYSYMBOL_LBRACKET = 18,                  /* LBRACKET  */
+  YYSYMBOL_RBRACKET = 19,                  /* RBRACKET  */
   YYSYMBOL_LBRACE = 20,                    /* LBRACE  */
   YYSYMBOL_RBRACE = 21,                    /* RBRACE  */
-  YYSYMBOL_UNRECOGNIZED = 22,              /* UNRECOGNIZED  */
-  YYSYMBOL_YYACCEPT = 23,                  /* $accept  */
-  YYSYMBOL_Program = 24,                   /* Program  */
-  YYSYMBOL_FunctionDefList = 25,           /* FunctionDefList  */
-  YYSYMBOL_FunctionDef = 26,               /* FunctionDef  */
-  YYSYMBOL_VarDeclList = 27,               /* VarDeclList  */
-  YYSYMBOL_VarDecl = 28,                   /* VarDecl  */
-  YYSYMBOL_StmtList = 29,                  /* StmtList  */
-  YYSYMBOL_Stmt = 30,                      /* Stmt  */
-  YYSYMBOL_ArrayAccess = 31,               /* ArrayAccess  */
-  YYSYMBOL_Expr = 32                       /* Expr  */
+  YYSYMBOL_COMMA = 22,                     /* COMMA  */
+  YYSYMBOL_UNRECOGNIZED = 23,              /* UNRECOGNIZED  */
+  YYSYMBOL_YYACCEPT = 24,                  /* $accept  */
+  YYSYMBOL_Program = 25,                   /* Program  */
+  YYSYMBOL_FunctionDefList = 26,           /* FunctionDefList  */
+  YYSYMBOL_FunctionDef = 27,               /* FunctionDef  */
+  YYSYMBOL_ParamList = 28,                 /* ParamList  */
+  YYSYMBOL_Param = 29,                     /* Param  */
+  YYSYMBOL_VarDeclList = 30,               /* VarDeclList  */
+  YYSYMBOL_VarDecl = 31,                   /* VarDecl  */
+  YYSYMBOL_StmtList = 32,                  /* StmtList  */
+  YYSYMBOL_Stmt = 33,                      /* Stmt  */
+  YYSYMBOL_FunctionCall = 34,              /* FunctionCall  */
+  YYSYMBOL_ArgList = 35,                   /* ArgList  */
+  YYSYMBOL_ArrayAccess = 36,               /* ArrayAccess  */
+  YYSYMBOL_Expr = 37                       /* Expr  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -484,19 +489,19 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  6
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   71
+#define YYLAST   91
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  23
+#define YYNTOKENS  24
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  10
+#define YYNNTS  14
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  25
+#define YYNRULES  35
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  59
+#define YYNSTATES  74
 
 /* YYMAXUTOK -- Last valid token kind.  */
-#define YYMAXUTOK   277
+#define YYMAXUTOK   278
 
 
 /* YYTRANSLATE(TOKEN-NUM) -- Symbol number corresponding to TOKEN-NUM
@@ -537,16 +542,17 @@ static const yytype_int8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     1,     2,     3,     4,
        5,     6,     7,     8,     9,    10,    11,    12,    13,    14,
-      15,    16,    17,    18,    19,    20,    21,    22
+      15,    16,    17,    18,    19,    20,    21,    22,    23
 };
 
 #if YYDEBUG
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,    65,    65,    77,    80,    90,   104,   107,   117,   133,
-     153,   156,   166,   197,   243,   265,   285,   303,   311,   319,
-     327,   335,   339,   352,   358,   364
+       0,    67,    67,    79,    82,    92,   133,   136,   141,   149,
+     159,   162,   172,   188,   208,   211,   221,   252,   298,   319,
+     322,   331,   356,   359,   364,   372,   390,   398,   406,   414,
+     422,   426,   439,   445,   451,   454
 };
 #endif
 
@@ -562,12 +568,13 @@ static const char *yysymbol_name (yysymbol_kind_t yysymbol) YY_ATTRIBUTE_UNUSED;
    First, the terminals, then, starting at YYNTOKENS, nonterminals.  */
 static const char *const yytname[] =
 {
-  "\"end of file\"", "error", "\"invalid token\"", "TYPE", "ID",
-  "SEMICOLON", "EQ", "PLUS", "MINUS", "MULTIPLY", "DIVIDE", "INTEGER",
-  "FLOAT", "WRITE", "LPAREN", "RPAREN", "LBRACKET", "RBRACKET", "FUNCTION",
-  "RETURN", "LBRACE", "RBRACE", "UNRECOGNIZED", "$accept", "Program",
-  "FunctionDefList", "FunctionDef", "VarDeclList", "VarDecl", "StmtList",
-  "Stmt", "ArrayAccess", "Expr", YY_NULLPTR
+  "\"end of file\"", "error", "\"invalid token\"", "FUNCTION", "RETURN",
+  "TYPE", "ID", "SEMICOLON", "EQ", "PLUS", "MINUS", "MULTIPLY", "DIVIDE",
+  "INTEGER", "FLOAT", "WRITE", "LPAREN", "RPAREN", "LBRACKET", "RBRACKET",
+  "LBRACE", "RBRACE", "COMMA", "UNRECOGNIZED", "$accept", "Program",
+  "FunctionDefList", "FunctionDef", "ParamList", "Param", "VarDeclList",
+  "VarDecl", "StmtList", "Stmt", "FunctionCall", "ArgList", "ArrayAccess",
+  "Expr", YY_NULLPTR
 };
 
 static const char *
@@ -577,7 +584,7 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-20)
+#define YYPACT_NINF (-16)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
@@ -591,12 +598,14 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int8 yypact[] =
 {
-     -11,     8,    28,    31,   -11,    17,   -20,    39,    25,    31,
-     -20,    29,    -1,     0,    21,   -20,    25,    30,   -20,    33,
-     -20,    34,    21,    44,    21,    48,   -20,   -20,    21,   -20,
-      41,   -20,    21,    31,    49,    47,    60,    10,    32,   -20,
-      21,    21,    21,    21,    53,    25,    62,   -20,   -20,   -20,
-     -20,     1,     1,   -20,   -20,   -20,    50,   -20,   -20
+      23,     2,    36,    47,    23,    35,   -16,    53,     1,    47,
+     -16,    48,     4,    29,    11,    29,   -16,     1,    58,    52,
+     -16,    65,    60,    61,   -16,    71,     5,   -16,   -16,    29,
+     -16,   -16,    37,    29,    29,    29,    57,   -16,   -16,    29,
+     -16,    62,    48,    66,    46,   -16,    29,    29,    29,    29,
+      63,    70,     3,    22,   -16,    69,    47,   -16,    79,   -16,
+       6,     6,   -16,   -16,   -16,   -16,    29,   -16,   -16,     1,
+     -16,   -16,    67,   -16
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -604,24 +613,28 @@ static const yytype_int8 yypact[] =
    means the default is an error.  */
 static const yytype_int8 yydefact[] =
 {
-       3,     0,     0,     6,     3,     0,     1,     0,    10,     6,
-       4,     0,     0,     0,     0,     2,    10,     0,     7,     0,
-       8,     0,     0,     0,     0,    22,    23,    24,     0,    25,
-       0,    11,     0,     6,     0,     0,     0,     0,     0,    14,
-       0,     0,     0,     0,     0,    10,     0,    12,    15,    16,
-      21,    17,    18,    19,    20,    13,     0,     9,     5
+       3,     0,     0,    10,     3,     0,     1,     0,    14,    10,
+       4,     6,     0,     0,     0,     0,     2,    14,     0,     0,
+      11,     0,     0,     7,    12,     0,    31,    32,    33,     0,
+      35,    34,     0,     0,    22,     0,     0,    15,    19,     0,
+       9,     0,     6,     0,     0,    20,     0,     0,     0,     0,
+       0,     0,    23,     0,    18,     0,    10,     8,     0,    30,
+      26,    27,    28,    29,    16,    21,    22,    25,    17,    14,
+      13,    24,     0,     5
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-     -20,   -20,    64,   -20,    -7,   -20,   -15,   -20,    -8,   -19
+     -16,   -16,    85,   -16,    49,   -16,    -6,   -16,   -15,   -16,
+      -8,    24,    -7,    -9
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-       0,     2,     3,     4,     8,     9,    15,    16,    29,    30
+       0,     2,     3,     4,    22,    23,     8,     9,    16,    17,
+      30,    51,    31,    52
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -629,54 +642,62 @@ static const yytype_int8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int8 yytable[] =
 {
-      17,    31,    18,    35,    20,    37,    22,     1,    17,    38,
-      42,    43,     5,    44,    23,    21,    24,    40,    41,    42,
-      43,    51,    52,    53,    54,    25,    45,    49,     6,    13,
-      56,    11,    26,    27,     7,    28,    32,    17,    14,    40,
-      41,    42,    43,    12,    19,    34,    39,    50,    40,    41,
-      42,    43,    47,    33,    40,    41,    42,    43,    55,    36,
-      40,    41,    42,    43,    24,    48,    46,    57,    10,     0,
-       0,    58
+      18,    19,    37,    20,    32,    13,    36,    14,     5,    18,
+      19,    24,    46,    47,    48,    49,    15,    48,    49,    33,
+      44,    34,    25,    35,    50,    66,    53,    34,     1,    35,
+      55,    46,    47,    48,    49,    26,     6,    60,    61,    62,
+      63,    67,    27,    28,    45,    29,    46,    47,    48,    49,
+      69,    11,     7,    21,    72,    46,    47,    48,    49,    12,
+      39,    18,    19,    59,    54,    38,    46,    47,    48,    49,
+      64,    40,    46,    47,    48,    49,    68,    41,    46,    47,
+      48,    49,    56,    42,    43,    58,    70,    65,    73,    10,
+      71,    57
 };
 
 static const yytype_int8 yycheck[] =
 {
-       8,    16,     9,    22,     5,    24,     6,    18,    16,    28,
-       9,    10,     4,    32,    14,    16,    16,     7,     8,     9,
-      10,    40,    41,    42,    43,     4,    33,    17,     0,     4,
-      45,    14,    11,    12,     3,    14,     6,    45,    13,     7,
-       8,     9,    10,     4,    15,    11,     5,    15,     7,     8,
-       9,    10,     5,    20,     7,     8,     9,    10,     5,    15,
-       7,     8,     9,    10,    16,     5,    17,     5,     4,    -1,
-      -1,    21
+       8,     8,    17,     9,    13,     4,    15,     6,     6,    17,
+      17,     7,     9,    10,    11,    12,    15,    11,    12,     8,
+      29,    16,    18,    18,    33,    22,    35,    16,     5,    18,
+      39,     9,    10,    11,    12,     6,     0,    46,    47,    48,
+      49,    19,    13,    14,     7,    16,     9,    10,    11,    12,
+      56,    16,     5,     5,    69,     9,    10,    11,    12,     6,
+       8,    69,    69,    17,     7,     7,     9,    10,    11,    12,
+       7,     6,     9,    10,    11,    12,     7,    17,     9,    10,
+      11,    12,    20,    22,    13,    19,     7,    17,    21,     4,
+      66,    42
 };
 
 /* YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
    state STATE-NUM.  */
 static const yytype_int8 yystos[] =
 {
-       0,    18,    24,    25,    26,     4,     0,     3,    27,    28,
-      25,    14,     4,     4,    13,    29,    30,    31,    27,    15,
-       5,    16,     6,    14,    16,     4,    11,    12,    14,    31,
-      32,    29,     6,    20,    11,    32,    15,    32,    32,     5,
-       7,     8,     9,    10,    32,    27,    17,     5,     5,    17,
-      15,    32,    32,    32,    32,     5,    29,     5,    21
+       0,     5,    25,    26,    27,     6,     0,     5,    30,    31,
+      26,    16,     6,     4,     6,    15,    32,    33,    34,    36,
+      30,     5,    28,    29,     7,    18,     6,    13,    14,    16,
+      34,    36,    37,     8,    16,    18,    37,    32,     7,     8,
+       6,    17,    22,    13,    37,     7,     9,    10,    11,    12,
+      37,    35,    37,    37,     7,    37,    20,    28,    19,    17,
+      37,    37,    37,    37,     7,    17,    22,    19,     7,    30,
+       7,    35,    32,    21
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr1[] =
 {
-       0,    23,    24,    25,    25,    26,    27,    27,    28,    28,
-      29,    29,    30,    30,    30,    30,    31,    32,    32,    32,
-      32,    32,    32,    32,    32,    32
+       0,    24,    25,    26,    26,    27,    28,    28,    28,    29,
+      30,    30,    31,    31,    32,    32,    33,    33,    33,    33,
+      33,    34,    35,    35,    35,    36,    37,    37,    37,    37,
+      37,    37,    37,    37,    37,    37
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
 static const yytype_int8 yyr2[] =
 {
-       0,     2,     3,     0,     2,     8,     0,     2,     3,     6,
-       0,     2,     4,     4,     3,     4,     4,     3,     3,     3,
-       3,     3,     1,     1,     1,     1
+       0,     2,     3,     0,     2,     9,     0,     1,     3,     2,
+       0,     2,     3,     6,     0,     2,     4,     4,     3,     2,
+       3,     4,     0,     1,     3,     4,     3,     3,     3,     3,
+       3,     1,     1,     1,     1,     1
 };
 
 
@@ -1140,7 +1161,7 @@ yyreduce:
   switch (yyn)
     {
   case 2: /* Program: FunctionDefList VarDeclList StmtList  */
-#line 65 "parser.y"
+#line 67 "parser.y"
                                          {
         (yyval.ast) = createNode(NodeType_Program);
         (yyval.ast)->program.functionDefList = (yyvsp[-2].ast);
@@ -1148,21 +1169,21 @@ yyreduce:
         (yyval.ast)->program.stmtList = (yyvsp[0].ast);
         root = (yyval.ast); // Set the global root pointer to the root of the AST
 
-        printf("\n[INFO] Program parsed successfully with functions.\n");
+        printf("\n[INFO] Program parsed successfully.\n");
     }
-#line 1154 "parser.tab.c"
+#line 1175 "parser.tab.c"
     break;
 
   case 3: /* FunctionDefList: %empty  */
-#line 77 "parser.y"
+#line 79 "parser.y"
                 {
-        (yyval.ast) = NULL; // No functions defined
+        (yyval.ast) = NULL;
     }
-#line 1162 "parser.tab.c"
+#line 1183 "parser.tab.c"
     break;
 
   case 4: /* FunctionDefList: FunctionDef FunctionDefList  */
-#line 80 "parser.y"
+#line 82 "parser.y"
                                   {
         (yyval.ast) = createNode(NodeType_FunctionDefList);
         (yyval.ast)->functionDefList.functionDef = (yyvsp[-1].ast);
@@ -1170,35 +1191,102 @@ yyreduce:
 
         printf("[INFO] Function definition list recognized.\n");
     }
-#line 1174 "parser.tab.c"
+#line 1195 "parser.tab.c"
     break;
 
-  case 5: /* FunctionDef: FUNCTION ID LPAREN RPAREN LBRACE VarDeclList StmtList RBRACE  */
-#line 90 "parser.y"
-                                                                 {
+  case 5: /* FunctionDef: TYPE ID LPAREN ParamList RPAREN LBRACE VarDeclList StmtList RBRACE  */
+#line 92 "parser.y"
+                                                                       {
         (yyval.ast) = createNode(NodeType_FunctionDef);
-        (yyval.ast)->functionDef.name = strdup((yyvsp[-6].string));
+        (yyval.ast)->functionDef.name = strdup((yyvsp[-7].string));
+        (yyval.ast)->functionDef.paramList = (yyvsp[-5].ast);
         (yyval.ast)->functionDef.varDeclList = (yyvsp[-2].ast);
         (yyval.ast)->functionDef.stmtList = (yyvsp[-1].ast);
 
-        // Add function to symbol table
-        addFunctionSymbol(symTab, (yyvsp[-6].string));
+        printf("[INFO] Function '%s' definition recognized.\n", (yyvsp[-7].string));
 
-        printf("[INFO] Function defined: %s\n", (yyvsp[-6].string));
+        // Map return type string to SymbolType
+        SymbolType returnType;
+        if (strcmp((yyvsp[-8].string), "int") == 0) {
+            returnType = TYPE_INT;
+        } else if (strcmp((yyvsp[-8].string), "float") == 0) {
+            returnType = TYPE_FLOAT;
+        } else {
+            returnType = TYPE_UNKNOWN;
+        }
+
+        // Add function symbol to the global symbol table
+        addFunctionSymbol(symTab, (yyvsp[-7].string), returnType, (yyvsp[-5].ast));
+
+        // Create a new symbol table for the function's scope
+        SymbolTable* functionSymTab = createSymbolTable(TABLE_SIZE);
+        functionSymTab->parent = symTab; // Set the parent to the current symbol table
+
+        // Switch to the function's symbol table
+        symTab = functionSymTab;
+
+        // Add parameters to the function's symbol table
+        addParametersToSymbolTable((yyvsp[-5].ast), symTab);
+
+        // Parse var declarations and statements inside the function
+        // They are already parsed and attached to the AST
+
+        // After parsing function body, restore the previous symbol table
+        symTab = symTab->parent;
     }
-#line 1190 "parser.tab.c"
+#line 1238 "parser.tab.c"
     break;
 
-  case 6: /* VarDeclList: %empty  */
-#line 104 "parser.y"
+  case 6: /* ParamList: %empty  */
+#line 133 "parser.y"
+                {
+        (yyval.ast) = NULL;
+    }
+#line 1246 "parser.tab.c"
+    break;
+
+  case 7: /* ParamList: Param  */
+#line 136 "parser.y"
+            {
+        (yyval.ast) = createNode(NodeType_ParamList);
+        (yyval.ast)->paramList.param = (yyvsp[0].ast);
+        (yyval.ast)->paramList.next = NULL;
+    }
+#line 1256 "parser.tab.c"
+    break;
+
+  case 8: /* ParamList: Param COMMA ParamList  */
+#line 141 "parser.y"
+                            {
+        (yyval.ast) = createNode(NodeType_ParamList);
+        (yyval.ast)->paramList.param = (yyvsp[-2].ast);
+        (yyval.ast)->paramList.next = (yyvsp[0].ast);
+    }
+#line 1266 "parser.tab.c"
+    break;
+
+  case 9: /* Param: TYPE ID  */
+#line 149 "parser.y"
+            {
+        (yyval.ast) = createNode(NodeType_Param);
+        (yyval.ast)->param.varType = strdup((yyvsp[-1].string));
+        (yyval.ast)->param.varName = strdup((yyvsp[0].string));
+
+        printf("[INFO] Parameter recognized: %s %s\n", (yyvsp[-1].string), (yyvsp[0].string));
+    }
+#line 1278 "parser.tab.c"
+    break;
+
+  case 10: /* VarDeclList: %empty  */
+#line 159 "parser.y"
                 {
         (yyval.ast) = NULL; // Handle case where there are no variable declarations
     }
-#line 1198 "parser.tab.c"
+#line 1286 "parser.tab.c"
     break;
 
-  case 7: /* VarDeclList: VarDecl VarDeclList  */
-#line 107 "parser.y"
+  case 11: /* VarDeclList: VarDecl VarDeclList  */
+#line 162 "parser.y"
                           {
         (yyval.ast) = createNode(NodeType_VarDeclList);
         (yyval.ast)->varDeclList.varDecl = (yyvsp[-1].ast);
@@ -1206,11 +1294,11 @@ yyreduce:
 
         printf("[INFO] Variable declaration list recognized.\n");
     }
-#line 1210 "parser.tab.c"
+#line 1298 "parser.tab.c"
     break;
 
-  case 8: /* VarDecl: TYPE ID SEMICOLON  */
-#line 117 "parser.y"
+  case 12: /* VarDecl: TYPE ID SEMICOLON  */
+#line 172 "parser.y"
                       {
         SymbolValue value;
         if (strcmp((yyvsp[-2].string), "int") == 0) {
@@ -1227,11 +1315,11 @@ yyreduce:
 
         printf("[INFO] Variable declared: %s %s;\n", (yyvsp[-2].string), (yyvsp[-1].string));
     }
-#line 1231 "parser.tab.c"
+#line 1319 "parser.tab.c"
     break;
 
-  case 9: /* VarDecl: TYPE ID LBRACKET INTEGER RBRACKET SEMICOLON  */
-#line 133 "parser.y"
+  case 13: /* VarDecl: TYPE ID LBRACKET INTEGER RBRACKET SEMICOLON  */
+#line 188 "parser.y"
                                                   {
         SymbolValue value;
         if (strcmp((yyvsp[-5].string), "int") == 0) {
@@ -1249,19 +1337,19 @@ yyreduce:
 
         printf("[INFO] Array declared: %s %s[%d];\n", (yyvsp[-5].string), (yyvsp[-4].string), (yyvsp[-2].integer));
     }
-#line 1253 "parser.tab.c"
+#line 1341 "parser.tab.c"
     break;
 
-  case 10: /* StmtList: %empty  */
-#line 153 "parser.y"
+  case 14: /* StmtList: %empty  */
+#line 208 "parser.y"
                 {
         (yyval.ast) = NULL; // Handle the case where there are no statements
     }
-#line 1261 "parser.tab.c"
+#line 1349 "parser.tab.c"
     break;
 
-  case 11: /* StmtList: Stmt StmtList  */
-#line 156 "parser.y"
+  case 15: /* StmtList: Stmt StmtList  */
+#line 211 "parser.y"
                     {
         (yyval.ast) = createNode(NodeType_StmtList);
         (yyval.ast)->stmtList.stmt = (yyvsp[-1].ast);
@@ -1269,11 +1357,11 @@ yyreduce:
 
         printf("[INFO] Statement list recognized.\n");
     }
-#line 1273 "parser.tab.c"
+#line 1361 "parser.tab.c"
     break;
 
-  case 12: /* Stmt: ID EQ Expr SEMICOLON  */
-#line 166 "parser.y"
+  case 16: /* Stmt: ID EQ Expr SEMICOLON  */
+#line 221 "parser.y"
                          {
         Symbol* sym = lookupSymbol(symTab, (yyvsp[-3].string));
         if (sym == NULL) {
@@ -1305,11 +1393,11 @@ yyreduce:
 
         printf("[INFO] Assignment statement recognized: %s = ...;\n", (yyvsp[-3].string));
     }
-#line 1309 "parser.tab.c"
+#line 1397 "parser.tab.c"
     break;
 
-  case 13: /* Stmt: ArrayAccess EQ Expr SEMICOLON  */
-#line 197 "parser.y"
+  case 17: /* Stmt: ArrayAccess EQ Expr SEMICOLON  */
+#line 252 "parser.y"
                                     {
         printf("[DEBUG] Array assignment detected: %s[index] = Expr\n", (yyvsp[-3].ast)->arrayAccess.arrayName); // Debug print
 
@@ -1357,61 +1445,113 @@ yyreduce:
 
         printf("[INFO] Array assignment recognized: %s[%d] = ...;\n", (yyvsp[-3].ast)->arrayAccess.arrayName, index);
     }
-#line 1361 "parser.tab.c"
+#line 1449 "parser.tab.c"
     break;
 
-  case 14: /* Stmt: WRITE Expr SEMICOLON  */
-#line 243 "parser.y"
+  case 18: /* Stmt: WRITE Expr SEMICOLON  */
+#line 298 "parser.y"
                              {
         (yyval.ast) = createNode(NodeType_WriteStmt);
-        char buffer[50]; // Buffer to store the string representation
+        char* id = NULL;
 
-        // Evaluate the expression to get its value
-        float value = evaluateExpr((yyvsp[-1].ast), symTab);
-
-        // Convert the value to a string
-        if ((yyvsp[-1].ast)->type == NodeType_IntExpr || (yyvsp[-1].ast)->type == NodeType_SimpleID) {
-            sprintf(buffer, "%d", (int)value);
-        } else if ((yyvsp[-1].ast)->type == NodeType_FloatExpr) {
-            sprintf(buffer, "%f", value);
-        } else {
-            // Handle other expression types if necessary
-            sprintf(buffer, "%f", value);
+        if ((yyvsp[-1].ast)->type == NodeType_SimpleID) {
+            Symbol* sym = lookupSymbol(symTab, (yyvsp[-1].ast)->simpleID.name);
+            if (sym == NULL) {
+                fprintf(stderr, "Error: Undeclared variable '%s' used in write statement at line %d.\n", (yyvsp[-1].ast)->simpleID.name, yylineno);
+                parseErrorFlag = 1;
+                YYABORT;
+            }
+            id = strdup((yyvsp[-1].ast)->simpleID.name);
+        } else if ((yyvsp[-1].ast)->type == NodeType_IntExpr) {
+            id = strdup("intExpr");
         }
 
-        printf("[DEBUG] Write statement detected: write %s\n", buffer);
+        printf("[DEBUG] Write statement detected: write %s\n", id); // Debug print
 
-        (yyval.ast)->writeStmt.id = strdup(buffer);
-        generateTAC("WRITE", buffer, NULL, NULL);
-        printf("[INFO] Write statement recognized: write %s;\n", buffer);
+        (yyval.ast)->writeStmt.id = id;
+        generateTAC("WRITE", id, NULL, NULL);
+        printf("[INFO] Write statement recognized: write %s;\n", id);
     }
-#line 1389 "parser.tab.c"
+#line 1476 "parser.tab.c"
     break;
 
-  case 15: /* Stmt: ID LPAREN RPAREN SEMICOLON  */
-#line 265 "parser.y"
-                                   {
-        // Function call statement
-        Symbol* sym = lookupSymbol(symTab, (yyvsp[-3].string));
-        if (sym == NULL || sym->type != TYPE_FUNCTION) {
-            fprintf(stderr, "Error: Undeclared function '%s' called at line %d.\n", (yyvsp[-3].string), yylineno);
-            parseErrorFlag = 1;
-            YYABORT;
-        }
+  case 19: /* Stmt: FunctionCall SEMICOLON  */
+#line 319 "parser.y"
+                               {
+        (yyval.ast) = (yyvsp[-1].ast);
+        printf("[INFO] Function call statement recognized.\n");
+    }
+#line 1485 "parser.tab.c"
+    break;
 
+  case 20: /* Stmt: RETURN Expr SEMICOLON  */
+#line 322 "parser.y"
+                              {
+        (yyval.ast) = createNode(NodeType_ReturnStmt);
+        (yyval.ast)->returnStmt.expr = (yyvsp[-1].ast);
+
+        printf("[INFO] Return statement recognized.\n");
+    }
+#line 1496 "parser.tab.c"
+    break;
+
+  case 21: /* FunctionCall: ID LPAREN ArgList RPAREN  */
+#line 331 "parser.y"
+                             {
         (yyval.ast) = createNode(NodeType_FunctionCall);
         (yyval.ast)->functionCall.name = strdup((yyvsp[-3].string));
+        (yyval.ast)->functionCall.args = (yyvsp[-1].ast);
 
-        printf("[INFO] Function call recognized: %s();\n", (yyvsp[-3].string));
+        printf("[INFO] Function call recognized: %s(...)\n", (yyvsp[-3].string));
 
-        // Generate TAC for function call
-        generateTAC("CALL", (yyvsp[-3].string), NULL, NULL);
+        // Check if function exists in the symbol table
+        Symbol* funcSym = lookupSymbol(symTab, (yyvsp[-3].string));
+        if (funcSym == NULL || funcSym->type != TYPE_FUNCTION) {
+            fprintf(stderr, "Error: Function '%s' not declared.\n", (yyvsp[-3].string));
+            parseErrorFlag = 1;
+            YYABORT;
+        } else {
+            // Check if arguments match parameters
+            if (!checkFunctionArguments(funcSym, (yyvsp[-1].ast), symTab)) {
+                fprintf(stderr, "Error: Argument mismatch in function call to '%s'.\n", (yyvsp[-3].string));
+                parseErrorFlag = 1;
+                YYABORT;
+            }
+        }
     }
-#line 1411 "parser.tab.c"
+#line 1523 "parser.tab.c"
     break;
 
-  case 16: /* ArrayAccess: ID LBRACKET Expr RBRACKET  */
-#line 285 "parser.y"
+  case 22: /* ArgList: %empty  */
+#line 356 "parser.y"
+                {
+        (yyval.ast) = NULL;
+    }
+#line 1531 "parser.tab.c"
+    break;
+
+  case 23: /* ArgList: Expr  */
+#line 359 "parser.y"
+           {
+        (yyval.ast) = createNode(NodeType_ArgList);
+        (yyval.ast)->argList.expr = (yyvsp[0].ast);
+        (yyval.ast)->argList.next = NULL;
+    }
+#line 1541 "parser.tab.c"
+    break;
+
+  case 24: /* ArgList: Expr COMMA ArgList  */
+#line 364 "parser.y"
+                         {
+        (yyval.ast) = createNode(NodeType_ArgList);
+        (yyval.ast)->argList.expr = (yyvsp[-2].ast);
+        (yyval.ast)->argList.next = (yyvsp[0].ast);
+    }
+#line 1551 "parser.tab.c"
+    break;
+
+  case 25: /* ArrayAccess: ID LBRACKET Expr RBRACKET  */
+#line 372 "parser.y"
                               {
         // Lookup the array in the symbol table
         Symbol* sym = lookupSymbol(symTab, (yyvsp[-3].string));
@@ -1427,11 +1567,11 @@ yyreduce:
 
         printf("[INFO] Array access recognized: %s[%d]\n", (yyvsp[-3].string), (int)evaluateExpr((yyvsp[-1].ast), symTab));
     }
-#line 1431 "parser.tab.c"
+#line 1571 "parser.tab.c"
     break;
 
-  case 17: /* Expr: Expr PLUS Expr  */
-#line 303 "parser.y"
+  case 26: /* Expr: Expr PLUS Expr  */
+#line 390 "parser.y"
                    {
         (yyval.ast) = createNode(NodeType_Expr);
         (yyval.ast)->expr.left = (yyvsp[-2].ast);
@@ -1440,11 +1580,11 @@ yyreduce:
 
         printf("[INFO] Expression recognized: ... + ...\n");
     }
-#line 1444 "parser.tab.c"
+#line 1584 "parser.tab.c"
     break;
 
-  case 18: /* Expr: Expr MINUS Expr  */
-#line 311 "parser.y"
+  case 27: /* Expr: Expr MINUS Expr  */
+#line 398 "parser.y"
                       {
         (yyval.ast) = createNode(NodeType_Expr);
         (yyval.ast)->expr.left = (yyvsp[-2].ast);
@@ -1453,11 +1593,11 @@ yyreduce:
 
         printf("[INFO] Expression recognized: ... - ...\n");
     }
-#line 1457 "parser.tab.c"
+#line 1597 "parser.tab.c"
     break;
 
-  case 19: /* Expr: Expr MULTIPLY Expr  */
-#line 319 "parser.y"
+  case 28: /* Expr: Expr MULTIPLY Expr  */
+#line 406 "parser.y"
                          {
         (yyval.ast) = createNode(NodeType_Expr);
         (yyval.ast)->expr.left = (yyvsp[-2].ast);
@@ -1466,11 +1606,11 @@ yyreduce:
 
         printf("[INFO] Expression recognized: ... * ...\n");
     }
-#line 1470 "parser.tab.c"
+#line 1610 "parser.tab.c"
     break;
 
-  case 20: /* Expr: Expr DIVIDE Expr  */
-#line 327 "parser.y"
+  case 29: /* Expr: Expr DIVIDE Expr  */
+#line 414 "parser.y"
                        {
         (yyval.ast) = createNode(NodeType_Expr);
         (yyval.ast)->expr.left = (yyvsp[-2].ast);
@@ -1479,20 +1619,20 @@ yyreduce:
 
         printf("[INFO] Expression recognized: ... / ...\n");
     }
-#line 1483 "parser.tab.c"
+#line 1623 "parser.tab.c"
     break;
 
-  case 21: /* Expr: LPAREN Expr RPAREN  */
-#line 335 "parser.y"
+  case 30: /* Expr: LPAREN Expr RPAREN  */
+#line 422 "parser.y"
                          {
         (yyval.ast) = (yyvsp[-1].ast);
         printf("[INFO] Parenthesized expression recognized: (...)\n");
     }
-#line 1492 "parser.tab.c"
+#line 1632 "parser.tab.c"
     break;
 
-  case 22: /* Expr: ID  */
-#line 339 "parser.y"
+  case 31: /* Expr: ID  */
+#line 426 "parser.y"
          {
         Symbol* sym = lookupSymbol(symTab, (yyvsp[0].string));
         if (sym == NULL) {
@@ -1506,41 +1646,49 @@ yyreduce:
 
         printf("[INFO] Identifier recognized: %s\n", (yyvsp[0].string));
     }
-#line 1510 "parser.tab.c"
+#line 1650 "parser.tab.c"
     break;
 
-  case 23: /* Expr: INTEGER  */
-#line 352 "parser.y"
+  case 32: /* Expr: INTEGER  */
+#line 439 "parser.y"
               {
         (yyval.ast) = createNode(NodeType_IntExpr);
         (yyval.ast)->IntExpr.integer = (yyvsp[0].integer);
 
         printf("[INFO] Integer recognized: %d\n", (yyvsp[0].integer));
     }
-#line 1521 "parser.tab.c"
+#line 1661 "parser.tab.c"
     break;
 
-  case 24: /* Expr: FLOAT  */
-#line 358 "parser.y"
+  case 33: /* Expr: FLOAT  */
+#line 445 "parser.y"
             {
         (yyval.ast) = createNode(NodeType_FloatExpr);
         (yyval.ast)->FloatExpr.floatNum = (yyvsp[0].floatNum);
 
         printf("[INFO] FLOAT recognized: %f\n", (yyvsp[0].floatNum));
     }
-#line 1532 "parser.tab.c"
+#line 1672 "parser.tab.c"
     break;
 
-  case 25: /* Expr: ArrayAccess  */
-#line 364 "parser.y"
+  case 34: /* Expr: ArrayAccess  */
+#line 451 "parser.y"
                   {
         (yyval.ast) = (yyvsp[0].ast);
     }
-#line 1540 "parser.tab.c"
+#line 1680 "parser.tab.c"
+    break;
+
+  case 35: /* Expr: FunctionCall  */
+#line 454 "parser.y"
+                   {
+        (yyval.ast) = (yyvsp[0].ast);
+    }
+#line 1688 "parser.tab.c"
     break;
 
 
-#line 1544 "parser.tab.c"
+#line 1692 "parser.tab.c"
 
       default: break;
     }
@@ -1733,7 +1881,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 369 "parser.y"
+#line 459 "parser.y"
  
 
 int main() {

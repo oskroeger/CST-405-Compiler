@@ -37,19 +37,38 @@ char* functionBeingParsed = NULL;
 %code requires {
     typedef struct {
         char* name;
+        char** paramNames;
+        char** paramTypes;
+        int paramCount;
     } FunctionHeaderInfo;
 }
 
 // Include the helper function in parser.tab.c
 %code {
-    FunctionHeaderInfo* createFunctionHeader(const char* name) {
+    FunctionHeaderInfo* createFunctionHeader(const char* name, int paramCount) {
         FunctionHeaderInfo* header = (FunctionHeaderInfo*)malloc(sizeof(FunctionHeaderInfo));
         if (header == NULL) {
             fprintf(stderr, "Error: Memory allocation failed for FunctionHeaderInfo.\n");
             exit(EXIT_FAILURE);
         }
         header->name = strdup(name);
+        header->paramCount = paramCount;
+        header->paramNames = (char**)malloc(paramCount * sizeof(char*));
+        header->paramTypes = (char**)malloc(paramCount * sizeof(char*));
         return header;
+    }
+
+    void freeFunctionHeader(FunctionHeaderInfo* header) {
+        if (header) {
+            free(header->name);
+            for (int i = 0; i < header->paramCount; i++) {
+                free(header->paramNames[i]);
+                free(header->paramTypes[i]);
+            }
+            free(header->paramNames);
+            free(header->paramTypes);
+            free(header);
+        }
     }
 }
 
@@ -120,27 +139,57 @@ FunctionDef:
         $$->functionDef.varDeclList = $2;
         $$->functionDef.stmtList = $3;
 
+        // Insert function parameters into symbol table
+        for (int i = 0; i < $1->paramCount; i++) {
+            SymbolValue val;
+            addSymbol(symTab, $1->paramNames[i], getTypeFromString($1->paramTypes[i]), val);
+        }
+
         // Add function to symbol table
         addFunctionSymbol(symTab, $1->name);
 
         printf("[INFO] Function defined: %s\n", $1->name);
 
         // Clean up
-        free($1->name);
-        free($1);
+        freeFunctionHeader($1);
     }
 ;
 
 FunctionHeader:
-    FUNCTION ID LPAREN RPAREN LBRACE {
-        // Allocate and store the function name
-        $$ = createFunctionHeader($2);
+    FUNCTION ID LPAREN ParamList RPAREN LBRACE {
+        $$ = createFunctionHeader($2, $3.paramCount);
+        for (int i = 0; i < $3.paramCount; i++) {
+            $$->paramNames[i] = strdup($3.paramNames[i]);
+            $$->paramTypes[i] = strdup($3.paramTypes[i]);
+        }
 
-        // Set the global functionBeingParsed
         functionBeingParsed = $$->name;
-
-        // Generate TAC for function start
         generateTAC("FUNC_START", functionBeingParsed, NULL, NULL);
+    }
+;
+
+ParamList:
+    /* empty */ {
+        $$ = (ParamListData){0, NULL, NULL};
+    }
+    | ParamListWithTypes {
+        $$ = $1;
+    }
+;
+
+ParamListWithTypes:
+    TYPE ID {
+        $$ = (ParamListData){1, malloc(sizeof(char*)), malloc(sizeof(char*))};
+        $$->paramNames[0] = strdup($2);
+        $$->paramTypes[0] = strdup($1);
+    }
+    | ParamListWithTypes COMMA TYPE ID {
+        $$ = $1;
+        $$->paramNames = realloc($$->paramNames, ($$->paramCount + 1) * sizeof(char*));
+        $$->paramTypes = realloc($$->paramTypes, ($$->paramCount + 1) * sizeof(char*));
+        $$->paramNames[$$->paramCount] = strdup($4);
+        $$->paramTypes[$$->paramCount] = strdup($3);
+        $$->paramCount++;
     }
 ;
 
@@ -452,19 +501,19 @@ int main() {
 
         // After TAC generation
         printf("\n----- GENERATED TAC (BEFORE OPTIMIZATION) -----\n");
-        printTAC();
+        // printTAC();
 
         // Step 1: Clean the TAC by replacing variable references with temp vars
         printf("\n----- CLEANED TAC -----\n");
-        replaceVariablesWithTemp(&tacHead, symTab);
-        printTAC();
+        // replaceVariablesWithTemp(&tacHead, symTab);
+        // printTAC();
 
         // Step 2: Optimize the cleaned-up TAC
-        optimizeTAC(&tacHead);
+        // optimizeTAC(&tacHead);
 
         // Generate MIPS code from the TAC
         printf("\n----- GENERATED MIPS CODE -----\n");
-        generateMIPS(tacHead);
+        // generateMIPS(tacHead);
 
         // Clean up the AST
         if (root != NULL) {

@@ -1,0 +1,6 @@
+t0 = MOV 4
+x = MOV t0
+f0 = MOV 3.000000
+y = MOV f0
+x = WRITE 
+y = WRITE 
