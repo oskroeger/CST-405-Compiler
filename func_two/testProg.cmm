@@ -10,5 +10,9 @@ function two() {
     write y;
 }
 
+int x;
+x = 4;
+write x;
+
 two();
 one();

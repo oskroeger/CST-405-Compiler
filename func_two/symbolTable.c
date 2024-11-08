@@ -4,8 +4,12 @@
 #include <string.h>
 #include <stdio.h>
 
-// Function to create a new symbol table
-SymbolTable* createSymbolTable(int size) {
+#define TABLE_SIZE 100
+
+static SymbolTable* currentScope = NULL;  // Global pointer to track the current scope
+
+// Function to create a new symbol table with a parent scope
+SymbolTable* createSymbolTable(SymbolTable* parent, int size) {
     SymbolTable* newTable = (SymbolTable*)malloc(sizeof(SymbolTable));
     if (!newTable) return NULL;
 
@@ -20,6 +24,7 @@ SymbolTable* createSymbolTable(int size) {
         newTable->table[i] = NULL;
     }
 
+    newTable->parent = parent;  // Set the parent scope
     return newTable;
 }
 
@@ -28,6 +33,27 @@ unsigned int hash(SymbolTable* table, char* name) {
     unsigned int hashval = 0;
     for (; *name != '\0'; name++) hashval = *name + (hashval << 5) - hashval;
     return hashval % table->size;
+}
+
+// Function to enter a new scope
+void enterScope() {
+    SymbolTable* newScope = createSymbolTable(currentScope, TABLE_SIZE);
+    if (newScope) {
+        currentScope = newScope;
+    } else {
+        fprintf(stderr, "Failed to create a new scope.\n");
+    }
+}
+
+// Function to exit the current scope
+void exitScope() {
+    if (currentScope) {
+        SymbolTable* oldScope = currentScope;
+        currentScope = currentScope->parent;
+        freeSymbolTable(oldScope);
+    } else {
+        fprintf(stderr, "No scope to exit.\n");
+    }
 }
 
 // Function to add a symbol to the table (for regular variables)
@@ -39,7 +65,7 @@ void addSymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue valu
 
     unsigned int hashval = hash(table, name);
 
-    // Check for an existing symbol with the same name
+    // Check for an existing symbol with the same name in the current scope
     for (Symbol* sym = table->table[hashval]; sym != NULL; sym = sym->next) {
         if (strcmp(name, sym->name) == 0) {
             // Update existing symbol's type and value
@@ -87,7 +113,6 @@ void addArraySymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue
     // Check for an existing symbol with the same name
     for (Symbol* sym = table->table[hashval]; sym != NULL; sym = sym->next) {
         if (strcmp(name, sym->name) == 0) {
-            // Update existing array symbol's type, value, and size
             sym->type = type;
             sym->size = size;
             if (type == TYPE_INT) {
@@ -99,23 +124,22 @@ void addArraySymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue
         }
     }
 
-    // If no existing symbol found, add a new array symbol
     Symbol* newSymbol = (Symbol*)malloc(sizeof(Symbol));
     if (!newSymbol) return;
 
     newSymbol->name = strdup(name);
     newSymbol->type = type;
-    newSymbol->size = size;  // Store the array size
+    newSymbol->size = size;
 
     if (type == TYPE_INT) {
         newSymbol->value.intArray = (int*)malloc(size * sizeof(int));
         for (int i = 0; i < size; i++) {
-            newSymbol->value.intArray[i] = 0;  // Initialize all elements to 0
+            newSymbol->value.intArray[i] = 0;
         }
     } else if (type == TYPE_FLOAT) {
         newSymbol->value.floatArray = (float*)malloc(size * sizeof(float));
         for (int i = 0; i < size; i++) {
-            newSymbol->value.floatArray[i] = 0.0;  // Initialize all elements to 0.0
+            newSymbol->value.floatArray[i] = 0.0;
         }
     }
 
@@ -131,42 +155,44 @@ void addFunctionSymbol(SymbolTable* table, char* name) {
 
     unsigned int hashval = hash(table, name);
 
-    // Check for an existing symbol with the same name
     for (Symbol* sym = table->table[hashval]; sym != NULL; sym = sym->next) {
         if (strcmp(name, sym->name) == 0) {
-            // Update existing symbol's type
             sym->type = TYPE_FUNCTION;
             return;
         }
     }
 
-    // If no existing symbol found, add a new function symbol
     Symbol* newSymbol = (Symbol*)malloc(sizeof(Symbol));
     if (!newSymbol) return;
 
     newSymbol->name = strdup(name);
     newSymbol->type = TYPE_FUNCTION;
-    newSymbol->size = 0;  // Functions don't have size
+    newSymbol->size = 0;
 
-    // No value to assign for functions in this simplified implementation
-    memset(&(newSymbol->value), 0, sizeof(SymbolValue)); // Initialize value union to zero
+    memset(&(newSymbol->value), 0, sizeof(SymbolValue));
 
     newSymbol->next = table->table[hashval];
     table->table[hashval] = newSymbol;
 }
 
-// Function to look up a name in the table
+// Function to look up a name in the table, checking parent scopes if needed
 Symbol* lookupSymbol(SymbolTable* table, char* name) {
     unsigned int hashval = hash(table, name);
+    SymbolTable* scope = table;
 
-    for (Symbol* sym = table->table[hashval]; sym != NULL; sym = sym->next) {
-        if (strcmp(name, sym->name) == 0) return sym;
+    while (scope) {
+        for (Symbol* sym = scope->table[hashval]; sym != NULL; sym = sym->next) {
+            if (strcmp(name, sym->name) == 0) {
+                return sym;
+            }
+        }
+        scope = scope->parent;  // Move to the parent scope if not found
     }
 
     return NULL;
 }
 
-// Function to free the symbol table
+// Function to free the symbol table and its symbols
 void freeSymbolTable(SymbolTable* table) {
     for (int i = 0; i < table->size; i++) {
         Symbol* sym = table->table[i];
@@ -174,15 +200,13 @@ void freeSymbolTable(SymbolTable* table) {
             Symbol* nextSym = sym->next;
             free(sym->name);
             if ((sym->type == TYPE_INT || sym->type == TYPE_FLOAT) && sym->size > 0) {
-                // Free array if it exists
                 if (sym->type == TYPE_INT) {
                     free(sym->value.intArray);
                 } else if (sym->type == TYPE_FLOAT) {
                     free(sym->value.floatArray);
                 }
             }
-            // No additional data to free for functions in this simple implementation
-            free(sym);  // Free the symbol
+            free(sym);
             sym = nextSym;
         }
     }
@@ -190,7 +214,7 @@ void freeSymbolTable(SymbolTable* table) {
     free(table);
 }
 
-// Function to print the symbol table (for debugging)
+// Function to print the symbol table for debugging
 void printSymbolTable(const SymbolTable* table) {
     printf("\n\n----- SYMBOL TABLE -----\n");
     for (int i = 0; i < table->size; i++) {
@@ -198,7 +222,7 @@ void printSymbolTable(const SymbolTable* table) {
         while (sym != NULL) {
             if (sym->type == TYPE_FUNCTION) {
                 printf("Name: %s | Type: FUNCTION\n", sym->name);
-            } else if (sym->size > 0) {   // Check if it's an array
+            } else if (sym->size > 0) {
                 printf("Name: %s | Type: %s | Array Size: %d\n", sym->name, symbolTypeToString(sym->type), sym->size);
                 if (sym->type == TYPE_INT) {
                     for (int j = 0; j < sym->size; j++) {
@@ -206,7 +230,7 @@ void printSymbolTable(const SymbolTable* table) {
                     }
                 } else if (sym->type == TYPE_FLOAT) {
                     for (int j = 0; j < sym->size; j++) {
-                        printf("\tIndex %d: %.4f\n", j, sym->value.floatArray[j]);  // Format floats to 4 decimal places
+                        printf("\tIndex %d: %.4f\n", j, sym->value.floatArray[j]);
                     }
                 }
             } else {
@@ -215,7 +239,7 @@ void printSymbolTable(const SymbolTable* table) {
                         printf("Name: %s | Type: INT | Value: %d\n", sym->name, sym->value.intValue);
                         break;
                     case TYPE_FLOAT:
-                        printf("Name: %s | Type: FLOAT | Value: %.4f\n", sym->name, sym->value.floatValue);  // Format float to 4 decimal places
+                        printf("Name: %s | Type: FLOAT | Value: %.4f\n", sym->name, sym->value.floatValue);
                         break;
                     case TYPE_CHAR:
                         printf("Name: %s | Type: CHAR | Value: %c\n", sym->name, sym->value.charValue);
@@ -232,14 +256,13 @@ void printSymbolTable(const SymbolTable* table) {
     printf("------------------------\n");
 }
 
-
 // Helper function to convert SymbolType to a string
 const char* symbolTypeToString(SymbolType type) {
     switch (type) {
         case TYPE_INT: return "int";
         case TYPE_FLOAT: return "float";
         case TYPE_CHAR: return "char";
-        case TYPE_FUNCTION: return "function"; // Added
+        case TYPE_FUNCTION: return "function";
         case TYPE_UNKNOWN: return "unknown";
         default: return "undefined";
     }
