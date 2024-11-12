@@ -133,11 +133,13 @@ FunctionDef:
 
 FunctionHeader:
     FUNCTION ID LPAREN RPAREN LBRACE {
-        // Allocate and store the function name
         $$ = createFunctionHeader($2);
 
         // Set the global functionBeingParsed
         functionBeingParsed = $$->name;
+
+        // Enter a new scope for the function
+        enterScope();
 
         // Generate TAC for function start
         generateTAC("FUNC_START", functionBeingParsed, NULL, NULL);
@@ -148,6 +150,9 @@ FunctionFooter:
     RBRACE {
         // Generate TAC for function end
         generateTAC("FUNC_END", functionBeingParsed, NULL, NULL);
+
+        // Exit the function's scope
+        exitScope();
 
         // Reset the global functionBeingParsed
         functionBeingParsed = NULL;
@@ -172,10 +177,10 @@ VarDecl:
         SymbolValue value;
         if (strcmp($1, "int") == 0) {
             value.intValue = INT_MIN; // Default value for uninitialized int
-            addSymbol(symTab, $2, TYPE_INT, value);
+            addSymbol(currentScope, $2, TYPE_INT, value);
         } else if (strcmp($1, "float") == 0) {
             value.floatValue = FLT_MIN; // Default value for uninitialized float
-            addSymbol(symTab, $2, TYPE_FLOAT, value);
+            addSymbol(currentScope, $2, TYPE_FLOAT, value);
         }
 
         $$ = createNode(NodeType_VarDecl);
@@ -188,10 +193,10 @@ VarDecl:
         SymbolValue value;
         if (strcmp($1, "int") == 0) {
             value.intArray = (int*)malloc($4 * sizeof(int));  // Allocate space for int array
-            addArraySymbol(symTab, $2, TYPE_INT, value, $4);  // $4 is the array size
+            addArraySymbol(currentScope, $2, TYPE_INT, value, $4);  // $4 is the array size
         } else if (strcmp($1, "float") == 0) {
             value.floatArray = (float*)malloc($4 * sizeof(float));  // Allocate space for float array
-            addArraySymbol(symTab, $2, TYPE_FLOAT, value, $4);  // $4 is the array size
+            addArraySymbol(currentScope, $2, TYPE_FLOAT, value, $4);  // $4 is the array size
         }
 
         $$ = createNode(NodeType_ArrayDecl);
@@ -218,7 +223,7 @@ StmtList:
 
 Stmt:
     ID EQ Expr SEMICOLON {
-        Symbol* sym = lookupSymbol(symTab, $1);
+        Symbol* sym = lookupSymbol(currentScope, $1);
         if (sym == NULL) {
             fprintf(stderr, "Error: Undeclared variable '%s' used at line %d.\n", $1, yylineno);
             parseErrorFlag = 1;
@@ -228,16 +233,16 @@ Stmt:
         printf("[DEBUG] Assignment detected: %s = Expr\n", $1); // Debug print
 
         if (sym->type == TYPE_INT) {
-            int value = (int)evaluateExpr($3, symTab);  // Cast to int
+            int value = (int)evaluateExpr($3, currentScope);  // Cast to int
             printf("[DEBUG] Assigning value to %s: %d\n", $1, value); // Debug print
             sym->value.intValue = value;
-            char* exprResult = generateExprTAC($3, symTab);
+            char* exprResult = generateExprTAC($3, currentScope);
             generateTAC("MOV", sym->name, exprResult, NULL);
         } else if (sym->type == TYPE_FLOAT) {
-            float value = evaluateExpr($3, symTab);  // Handle float values
+            float value = evaluateExpr($3, currentScope);  // Handle float values
             printf("[DEBUG] Assigning value to %s: %f\n", $1, value); // Debug print
             sym->value.floatValue = value;
-            char* exprResult = generateExprTAC($3, symTab);
+            char* exprResult = generateExprTAC($3, currentScope);
             generateTAC("MOV", sym->name, exprResult, NULL);
         }
 
@@ -251,14 +256,14 @@ Stmt:
     | ArrayAccess EQ Expr SEMICOLON {
         printf("[DEBUG] Array assignment detected: %s[index] = Expr\n", $1->arrayAccess.arrayName); // Debug print
 
-        Symbol* sym = lookupSymbol(symTab, $1->arrayAccess.arrayName);
+        Symbol* sym = lookupSymbol(currentScope, $1->arrayAccess.arrayName);
         if (sym == NULL) {
             fprintf(stderr, "Error: Undeclared array '%s' used at line %d.\n", $1->arrayAccess.arrayName, yylineno);
             parseErrorFlag = 1;
             YYABORT;
         }
 
-        int index = (int)evaluateExpr($1->arrayAccess.index, symTab);  // Evaluate index expression
+        int index = (int)evaluateExpr($1->arrayAccess.index, currentScope);  // Evaluate index expression
         printf("[DEBUG] Array index evaluated: %d\n", index); // Debug print for index value
 
         if (index < 0 || index >= sym->size) {
@@ -269,17 +274,17 @@ Stmt:
 
         // Evaluate the value to be assigned and store in the array based on its type
         if (sym->type == TYPE_INT) {
-            int value = (int)evaluateExpr($3, symTab); // Evaluate and cast to int for int arrays
+            int value = (int)evaluateExpr($3, currentScope); // Evaluate and cast to int for int arrays
             printf("[DEBUG] Assigning int value to %s[%d]: %d\n", $1->arrayAccess.arrayName, index, value); // Debug print
             sym->value.intArray[index] = value;  // Store in the int array
         } else if (sym->type == TYPE_FLOAT) {
-            float value = evaluateExpr($3, symTab); // Evaluate as float for float arrays
+            float value = evaluateExpr($3, currentScope); // Evaluate as float for float arrays
             printf("[DEBUG] Assigning float value to %s[%d]: %f\n", $1->arrayAccess.arrayName, index, value); // Debug print
             sym->value.floatArray[index] = value;  // Store in the float array
         }
 
         // Generate TAC for the array assignment
-        char* exprResult = generateExprTAC($3, symTab);
+        char* exprResult = generateExprTAC($3, currentScope);
 
         // Generate TAC with the array name and index
         char arrayAccessStr[50];
@@ -300,7 +305,7 @@ Stmt:
         char* id = NULL;
 
         if ($2->type == NodeType_SimpleID) {
-            Symbol* sym = lookupSymbol(symTab, $2->simpleID.name);
+            Symbol* sym = lookupSymbol(currentScope, $2->simpleID.name);
             if (sym == NULL) {
                 fprintf(stderr, "Error: Undeclared variable '%s' used in write statement at line %d.\n", $2->simpleID.name, yylineno);
                 parseErrorFlag = 1;
@@ -319,7 +324,7 @@ Stmt:
     }
     | ID LPAREN RPAREN SEMICOLON {
         // Function call statement
-        Symbol* sym = lookupSymbol(symTab, $1);
+        Symbol* sym = lookupSymbol(currentScope, $1);
         if (sym == NULL || sym->type != TYPE_FUNCTION) {
             fprintf(stderr, "Error: Undeclared function '%s' called at line %d.\n", $1, yylineno);
             parseErrorFlag = 1;
@@ -339,7 +344,7 @@ Stmt:
 ArrayAccess:
     ID LBRACKET Expr RBRACKET {
         // Lookup the array in the symbol table
-        Symbol* sym = lookupSymbol(symTab, $1);
+        Symbol* sym = lookupSymbol(currentScope, $1);
         if (sym == NULL) {
             fprintf(stderr, "Error: Undeclared array '%s' used at line %d.\n", $1, yylineno);
             parseErrorFlag = 1;
@@ -392,7 +397,7 @@ Expr:
         printf("[INFO] Parenthesized expression recognized: (...)\n");
     }
     | ID {
-        Symbol* sym = lookupSymbol(symTab, $1);
+        Symbol* sym = lookupSymbol(currentScope, $1);
         if (sym == NULL) {
             fprintf(stderr, "Error: Undeclared variable '%s' used at line %d.\n", $1, yylineno);
             parseErrorFlag = 1;
@@ -424,8 +429,21 @@ Expr:
 %%
 
 int main() {
-    // Initialize the symbol table
-    symTab = createSymbolTable(TABLE_SIZE);
+    // Initialize the global symbol table (global scope)
+    symTab = createSymbolTable(NULL, TABLE_SIZE);
+    if (symTab == NULL || symTab->table == NULL) {
+        fprintf(stderr, "[ERROR] Failed to initialize global symbol table.\n");
+        return EXIT_FAILURE;
+    }
+
+    // Set the global scope as the current scope
+    currentScope = symTab;
+    registerScope(currentScope);
+
+    if (scopeListHead == NULL) {
+        fprintf(stderr, "[ERROR] Scope list head is NULL after registering global scope.\n");
+        return EXIT_FAILURE;
+    }
 
     // Initialize file or input source
     yyin = fopen("testProg.cmm", "r");
@@ -440,29 +458,24 @@ int main() {
     if (parseResult == 0) {
         printf("\n\n--- Parsing successful! ---\n\n");
 
-        // Perform semantic analysis
-        // checkSemantics(root, symTab);
-
         printf("\n----- ABSTRACT SYNTAX TREE -----\n");
         if (root != NULL) {
             traverseAST(root, 0);
         }
 
-        printSymbolTable(symTab);
+        // Print the symbol table for all scopes
+        printSymbolTable(scopeListHead);
 
-        // After TAC generation
+        // TAC generation and optimization
         printf("\n----- GENERATED TAC (BEFORE OPTIMIZATION) -----\n");
         printTAC();
 
-        // Step 1: Clean the TAC by replacing variable references with temp vars
         printf("\n----- CLEANED TAC -----\n");
         replaceVariablesWithTemp(&tacHead, symTab);
         printTAC();
 
-        // Step 2: Optimize the cleaned-up TAC
         optimizeTAC(&tacHead);
 
-        // Generate MIPS code from the TAC
         printf("\n----- GENERATED MIPS CODE -----\n");
         generateMIPS(tacHead);
 
@@ -474,12 +487,22 @@ int main() {
         fprintf(stderr, "Parsing failed with errors\n");
     }
 
-    // Cleanup symbol table
-    freeSymbolTable(symTab);
+    // Cleanup the symbol tables
+    ScopeNode* currentNode = scopeListHead;
+    while (currentNode != NULL) {
+        if (currentNode->scope != NULL) {
+            freeSymbolTable(currentNode->scope);
+        }
+        ScopeNode* tempNode = currentNode;
+        currentNode = currentNode->next;
+        free(tempNode);
+    }
+    scopeListHead = NULL;
 
     fclose(yyin);
     return parseResult;
 }
+
 
 void yyerror(const char* s) {
     fprintf(stderr, "Error at line %d: %s\n", yylineno, s);

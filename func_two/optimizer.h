@@ -7,6 +7,13 @@
 #include <string.h>
 #include <stdbool.h>
 
+// Add this to your optimizer.h file
+typedef struct FunctionDef {
+    char* name;
+    TAC* code; // Pointer to the first TAC instruction of the function
+    struct FunctionDef* next;
+} FunctionDef;
+
 // Update the createTAC function to include SymbolType for handling int and float types
 TAC* createTAC(const char* operation, const char* result, const char* operand1, const char* operand2, SymbolType type);
 
@@ -22,6 +29,7 @@ void deadCodeElimination(TAC** head, TAC** optimizedHead);
 bool isBinaryOperation(const char* operation);
 void renumberRegisters(TAC** head);
 void replaceVariablesWithTemp(TAC** head, SymbolTable* symTab);
+void reorderTACAccordingToFunctionCalls(TAC** head);
 bool isArrayAccess(const char* str);
 bool isVariable(const char* str);
 bool isTemp(const char* str);

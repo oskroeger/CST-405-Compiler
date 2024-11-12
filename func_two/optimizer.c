@@ -22,7 +22,6 @@ TAC* createTAC(const char* operation, const char* result, const char* operand1, 
     return newTAC;
 }
 
-// Main optimization function
 void optimizeTAC(TAC** head) {
     TAC* optimizedHead = NULL;
 
@@ -37,12 +36,16 @@ void optimizeTAC(TAC** head) {
     TAC* finalOptimizedHead = NULL;
     deadCodeElimination(&propagatedHead, &finalOptimizedHead);
 
+    // Reorder TAC according to function call order
+    reorderTACAccordingToFunctionCalls(&finalOptimizedHead);
+
     // Renumber registers to maintain a clean sequence
     renumberRegisters(&finalOptimizedHead);
 
     // Update the original head to point to the fully optimized TAC
     *head = finalOptimizedHead;
 }
+
 
 
 void constantFolding(TAC** head, TAC** optimizedHead) {
@@ -514,6 +517,196 @@ void replaceVariablesWithTemp(TAC** head, SymbolTable* symTab) {
     // Update the original head to point to the cleaned TAC list
     *head = cleanedHead;
 }
+
+
+void reorderTACAccordingToFunctionCalls(TAC** head) {
+    TAC* current = *head;
+    TAC* newHead = NULL;
+    TAC* newTail = NULL;
+
+    // Map of function definitions
+    typedef struct FunctionDef {
+        char* name;
+        TAC* code; // Pointer to the first TAC instruction of the function
+        struct FunctionDef* next;
+    } FunctionDef;
+
+    FunctionDef* functionDefs = NULL; // Head of the function definitions list
+
+    // List of function calls in order
+    char* functionCallOrder[100]; // Array to store function names in call order
+    int functionCallCount = 0;
+
+    // First pass: Extract function definitions and remove them from the TAC list
+    TAC* prev = NULL;
+    current = *head;
+    while (current != NULL) {
+        if (current->operation != NULL && strcmp(current->operation, "FUNC_START") == 0) {
+            // Start of a function definition
+            char* functionName = current->result; // e.g., "one"
+            TAC* funcStart = current;
+
+            // Find the corresponding FUNC_END
+            TAC* funcEnd = current;
+            while (funcEnd != NULL && !(funcEnd->operation != NULL && strcmp(funcEnd->operation, "FUNC_END") == 0 && strcmp(funcEnd->result, functionName) == 0)) {
+                funcEnd = funcEnd->next;
+            }
+            if (funcEnd == NULL) {
+                fprintf(stderr, "Error: FUNC_END not found for function %s\n", functionName);
+                return;
+            }
+
+            // Create a FunctionDef node
+            FunctionDef* funcDef = (FunctionDef*)malloc(sizeof(FunctionDef));
+            funcDef->name = strdup(functionName);
+            funcDef->code = funcStart;
+            funcDef->next = functionDefs;
+            functionDefs = funcDef;
+
+            // Remove the function definition from the TAC list
+            if (prev == NULL) {
+                *head = funcEnd->next;
+                current = funcEnd->next;
+            } else {
+                prev->next = funcEnd->next;
+                current = funcEnd->next;
+            }
+            // Break the function definition from the rest of the list
+            funcEnd->next = NULL;
+
+            continue; // Continue without advancing current (since we've updated current)
+        } else {
+            // Regular instruction
+            prev = current;
+            current = current->next;
+        }
+    }
+
+    // Now, current TAC list (*head) contains main code without function definitions
+
+    // Second pass: Collect function calls in order
+    current = *head;
+    while (current != NULL) {
+        if (current->operation != NULL && strcmp(current->operation, "CALL") == 0) {
+            char* functionName = current->result; // e.g., "two"
+            // Check if functionName is already in functionCallOrder
+            int i;
+            int found = 0;
+            for (i = 0; i < functionCallCount; i++) {
+                if (strcmp(functionCallOrder[i], functionName) == 0) {
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found) {
+                functionCallOrder[functionCallCount++] = strdup(functionName);
+            }
+        }
+        current = current->next;
+    }
+
+    // Reconstruct the TAC code
+    // First, copy the main code, ignoring function markers
+    current = *head;
+    while (current != NULL) {
+        // Skip function markers
+        if (current->operation != NULL && (strcmp(current->operation, "FUNC_START") == 0 ||
+                                           strcmp(current->operation, "FUNC_END") == 0 ||
+                                           strcmp(current->operation, "CALL") == 0)) {
+            current = current->next;
+            continue;
+        }
+        // Copy the TAC instruction
+        TAC* newTAC = createTAC(current->operation, current->result, current->operand1, current->operand2, current->type);
+        if (newHead == NULL) {
+            newHead = newTAC;
+            newTail = newTAC;
+        } else {
+            newTail->next = newTAC;
+            newTail = newTAC;
+        }
+        current = current->next;
+    }
+
+    // Then, append the function definitions in order of function calls
+    for (int i = 0; i < functionCallCount; i++) {
+        char* functionName = functionCallOrder[i];
+        // Find the function definition
+        FunctionDef* funcDef = functionDefs;
+        while (funcDef != NULL) {
+            if (strcmp(funcDef->name, functionName) == 0) {
+                break;
+            }
+            funcDef = funcDef->next;
+        }
+        if (funcDef == NULL) {
+            fprintf(stderr, "Error: Function definition not found for %s\n", functionName);
+            continue;
+        }
+        // Append the function definition code, ignoring function markers
+        TAC* funcCode = funcDef->code;
+        while (funcCode != NULL) {
+            // Skip function markers
+            if (funcCode->operation != NULL && (strcmp(funcCode->operation, "FUNC_START") == 0 ||
+                                                strcmp(funcCode->operation, "FUNC_END") == 0)) {
+                funcCode = funcCode->next;
+                continue;
+            }
+            // Copy the TAC instruction
+            TAC* newTAC = createTAC(funcCode->operation, funcCode->result, funcCode->operand1, funcCode->operand2, funcCode->type);
+            if (newHead == NULL) {
+                newHead = newTAC;
+                newTail = newTAC;
+            } else {
+                newTail->next = newTAC;
+                newTail = newTAC;
+            }
+            funcCode = funcCode->next;
+        }
+    }
+
+    // Replace the original TAC list with the new list
+    *head = newHead;
+
+    // Free the functionCallOrder array strings
+    for (int i = 0; i < functionCallCount; i++) {
+        free(functionCallOrder[i]);
+    }
+
+    // Free the function definitions
+    FunctionDef* funcDef = functionDefs;
+    while (funcDef != NULL) {
+        FunctionDef* temp = funcDef;
+        funcDef = funcDef->next;
+        free(temp->name);
+        // We don't free temp->code because it's part of the TAC list which we'll be using
+        free(temp);
+    }
+
+    // Safely print the TAC after reordering
+    printf("\n----- TAC After Reordering -----\n");
+    current = *head;
+    while (current != NULL) {
+        // Safely retrieve the fields or use default strings if they are NULL
+        char* operation = current->operation ? current->operation : "NULL";
+        char* result = current->result ? current->result : "NULL";
+        char* operand1 = current->operand1 ? current->operand1 : "";
+        char* operand2 = current->operand2 ? current->operand2 : "";
+
+        if (operand2[0] != '\0') {
+            // For binary operations like ADD, SUB, etc.
+            printf("%s = %s %s %s\n", result, operand1, operation, operand2);
+        } else if (operand1[0] != '\0') {
+            // For unary operations like MOV
+            printf("%s = %s %s\n", result, operation, operand1);
+        } else {
+            // For operations that only involve the result
+            printf("%s = %s\n", result, operation);
+        }
+        current = current->next;
+    }
+}
+
 
 
 // Function to check if a string is an array access (e.g., arr[0])
