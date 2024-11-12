@@ -1,9 +1,0 @@
-int x;
-int y;
-int z;
-x = (5 + 2) * 3;
-y = x - 4;
-z = y * (x + y);
-write x;
-write y;
-write z;
