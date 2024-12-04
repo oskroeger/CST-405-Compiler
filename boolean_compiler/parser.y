@@ -71,14 +71,17 @@ char* functionBeingParsed = NULL;
 %token <operator> MINUS
 %token <operator> MULTIPLY
 %token <operator> DIVIDE
+%token <operator> GT LT GE LE EQEQ NEQ
 %token <integer> INTEGER
 %token <floatNum> FLOAT
 %token <string> WRITE
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token FUNCTION RETURN LBRACE RBRACE
+%token IF ELSE
 %token UNRECOGNIZED
 
+%nonassoc GT LT GE LE EQEQ NEQ
 %left PLUS MINUS
 %left MULTIPLY DIVIDE
 
@@ -339,6 +342,24 @@ Stmt:
         // Generate TAC for function call
         generateTAC("CALL", $1, NULL, NULL);
     }
+    | IF LPAREN Expr RPAREN Stmt ELSE Stmt {
+        $$ = createNode(NodeType_IfStmt);
+        $$->ifStmt.condition = $3;
+        $$->ifStmt.thenStmt = $5;
+        $$->ifStmt.elseStmt = $7;
+        printf("[INFO] If-Else statement recognized.\n");
+    }
+    | IF LPAREN Expr RPAREN Stmt {
+        $$ = createNode(NodeType_IfStmt);
+        $$->ifStmt.condition = $3;
+        $$->ifStmt.thenStmt = $5;
+        $$->ifStmt.elseStmt = NULL;
+        printf("[INFO] If statement recognized.\n");
+    }
+    | LBRACE StmtList RBRACE {
+        $$ = $2; // StmtList already represents the list of statements in the block
+        printf("[INFO] Block statement recognized.\n");
+    }
 ;
 
 ArrayAccess:
@@ -395,6 +416,48 @@ Expr:
     | LPAREN Expr RPAREN {
         $$ = $2;
         printf("[INFO] Parenthesized expression recognized: (...)\n");
+    }
+    | Expr GT Expr {
+        $$ = createNode(NodeType_Expr);
+        $$->expr.left = $1;
+        $$->expr.right = $3;
+        $$->expr.operator = strdup(">");
+        printf("[INFO] Expression recognized: ... > ...\n");
+    }
+    | Expr LT Expr {
+        $$ = createNode(NodeType_Expr);
+        $$->expr.left = $1;
+        $$->expr.right = $3;
+        $$->expr.operator = strdup(">");
+        printf("[INFO] Expression recognized: ... < ...\n");
+    }
+    | Expr GE Expr {
+        $$ = createNode(NodeType_Expr);
+        $$->expr.left = $1;
+        $$->expr.right = $3;
+        $$->expr.operator = strdup(">");
+        printf("[INFO] Expression recognized: ... >= ...\n");
+    }
+    | Expr LE Expr {
+        $$ = createNode(NodeType_Expr);
+        $$->expr.left = $1;
+        $$->expr.right = $3;
+        $$->expr.operator = strdup(">");
+        printf("[INFO] Expression recognized: ... <= ...\n");
+    }
+    | Expr EQEQ Expr {
+        $$ = createNode(NodeType_Expr);
+        $$->expr.left = $1;
+        $$->expr.right = $3;
+        $$->expr.operator = strdup(">");
+        printf("[INFO] Expression recognized: ... == ...\n");
+    }
+    | Expr NEQ Expr {
+        $$ = createNode(NodeType_Expr);
+        $$->expr.left = $1;
+        $$->expr.right = $3;
+        $$->expr.operator = strdup(">");
+        printf("[INFO] Expression recognized: ... != ...\n");
     }
     | ID {
         Symbol* sym = lookupSymbol(currentScope, $1);
