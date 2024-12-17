@@ -1,0 +1,29 @@
+// This is a single-line comment
+
+/* 
+   This is a multi-line comment 
+   to test block comments.
+*/
+
+// Function declaration
+function int add(int a, int b) {
+    int result;
+    result = a + b;
+    return result; // Return statement
+}
+
+function int main() {
+    int x;
+    int y;
+    int arr[2];
+
+    x = 4;
+
+    arr[0] = x;
+    arr[1] = 4;
+
+    y = add(arr[0], arr[1])
+
+    write x;
+    write y;
+}

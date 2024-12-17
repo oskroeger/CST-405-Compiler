@@ -2,15 +2,14 @@
 #include <float.h>
 #include <string.h>
 
-// Set the indentation level
 int indentValue = 2;
 
-// Print indentation for the current level
 void printIndent(int level) {
-    printf("%*s", level * indentValue, "");
+    for (int i = 0; i < level; i++) {
+        printf("   ");
+    }
 }
 
-// Map NodeType enums to readable strings
 const char* nodeTypeToString(NodeType type) {
     switch (type) {
         case NodeType_Program: return "Program";
@@ -33,9 +32,10 @@ const char* nodeTypeToString(NodeType type) {
     }
 }
 
-// Traverse and print the AST
 void traverseAST(ASTNode* node, int level) {
-    if (!node) return;
+    if (!node) {
+        return;
+    }
 
     printIndent(level);
     printf("|-- %s", nodeTypeToString(node->type));
@@ -53,17 +53,33 @@ void traverseAST(ASTNode* node, int level) {
             traverseAST(node->functionDefList.functionDefList, level + 1);
             break;
         case NodeType_FunctionDef:
-            printf(": %s  // Function Definition\n", node->functionDef.name);
+            printf(": %s\n", node->functionDef.name);
             traverseAST(node->functionDef.varDeclList, level + 1);
             traverseAST(node->functionDef.stmtList, level + 1);
             break;
         case NodeType_FunctionCall:
-            printf(": %s()  // Function Call\n", node->functionCall.name);
+            printf(": %s()\n", node->functionCall.name);
             break;
         case NodeType_VarDeclList:
             printf("\n");
             traverseAST(node->varDeclList.varDecl, level + 1);
             traverseAST(node->varDeclList.varDeclList, level + 1);
+            break;
+        case NodeType_IfStmt:
+            printf("\n");
+            printIndent(level);
+            printf("|-- If Statement\n");
+            printIndent(level + 1);
+            printf("|-- Condition:\n");
+            traverseAST(node->ifStmt.condition, level + 2);
+            printIndent(level + 1);
+            printf("|-- Then:\n");
+            traverseAST(node->ifStmt.thenStmt, level + 2);
+            if (node->ifStmt.elseStmt) {
+                printIndent(level + 1);
+                printf("|-- Else:\n");
+                traverseAST(node->ifStmt.elseStmt, level + 2);
+            }
             break;
         case NodeType_VarDecl:
             printf(": %s %s\n", node->varDecl.varType, node->varDecl.varName);
@@ -95,25 +111,11 @@ void traverseAST(ASTNode* node, int level) {
             traverseAST(node->assignStmt.expr, level + 1);
             break;
         case NodeType_ArrayDecl:
-            printf(": %s %s[%d]  // Array Declaration\n", node->arrayDecl.varType, node->arrayDecl.varName, node->arrayDecl.size);
+            printf(": %s %s[%d]\n", node->arrayDecl.varType, node->arrayDecl.varName, node->arrayDecl.size);
             break;
         case NodeType_ArrayAccess:
             printf(": %s[...]\n", node->arrayAccess.arrayName);
-            traverseAST(node->arrayAccess.index, level + 1); // Traverse the index expression
-            break;
-        case NodeType_IfStmt:
-            printf("\n");
-            printIndent(level + 1);
-            printf("|-- Condition:\n");
-            traverseAST(node->ifStmt.condition, level + 2);
-            printIndent(level + 1);
-            printf("|-- Then:\n");
-            traverseAST(node->ifStmt.thenStmt, level + 2);
-            if (node->ifStmt.elseStmt) {
-                printIndent(level + 1);
-                printf("|-- Else:\n");
-                traverseAST(node->ifStmt.elseStmt, level + 2);
-            }
+            traverseAST(node->arrayAccess.index, level + 1);  // Traverse the index expression
             break;
         default:
             printf(" (Unknown node type)\n");

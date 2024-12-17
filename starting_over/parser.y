@@ -8,7 +8,7 @@
 #include "symbolTable.h"
 #include "semantic.h"
 #include "codeGenerator.h"
-
+#include "optimizer.h"
 
 #define TABLE_SIZE 100
 
@@ -66,6 +66,7 @@ char* functionBeingParsed = NULL;
 %token <string> TYPE
 %token <string> ID
 %token <character> SEMICOLON
+%token <character> COMMA
 %token <operator> EQ
 %token <operator> PLUS
 %token <operator> MINUS
@@ -78,14 +79,14 @@ char* functionBeingParsed = NULL;
 %token LPAREN RPAREN
 %token LBRACKET RBRACKET
 %token FUNCTION RETURN LBRACE RBRACE
-%token IF ELSE
+%token IF ELSE WHILE
 %token UNRECOGNIZED
 
 %nonassoc GT LT GE LE EQEQ NEQ
 %left PLUS MINUS
 %left MULTIPLY DIVIDE
 
-%type <ast> Program VarDecl VarDeclList Stmt StmtList Expr ArrayAccess FunctionDef FunctionDefList
+%type <ast> Program VarDecl VarDeclList Stmt StmtList Expr ArrayAccess FunctionDef FunctionDefList Param ParamList
 %type <funcHeader> FunctionHeader
 %start Program
 
@@ -120,13 +121,14 @@ FunctionDef:
     FunctionHeader VarDeclList StmtList FunctionFooter {
         $$ = createNode(NodeType_FunctionDef);
         $$->functionDef.name = strdup($1->name);
+        $$->functionDef.paramList = $1->paramList; // Save the parameter list
         $$->functionDef.varDeclList = $2;
         $$->functionDef.stmtList = $3;
 
-        // Add function to symbol table
-        addFunctionSymbol(symTab, $1->name);
+        // Add function to symbol table with parameter types
+        addFunctionSymbol(symTab, $1->name, $1->paramList);
 
-        printf("[INFO] Function defined: %s\n", $1->name);
+        printf("[INFO] Function defined: %s with parameters.\n", $1->name);
 
         // Clean up
         free($1->name);
@@ -135,19 +137,55 @@ FunctionDef:
 ;
 
 FunctionHeader:
-    FUNCTION ID LPAREN RPAREN LBRACE {
+    FUNCTION ID LPAREN ParamList RPAREN LBRACE {
         $$ = createFunctionHeader($2);
+        $$->paramList = $4; // Capture the parameter list
 
         // Set the global functionBeingParsed
         functionBeingParsed = $$->name;
 
         // Enter a new scope for the function
         enterScope();
+
+        // Add parameters to the symbol table
+        addParametersToSymbolTable($4);
+
+        // Generate TAC for function start
+        generateTAC("FUNC_START", functionBeingParsed, NULL, NULL);
+    }
+;
+
+ParamList:
+    /* empty */ {
+        $$ = NULL; // No parameters
+    }
+    | Param {
+        $$ = createNode(NodeType_ParamList);
+        $$->paramList.param = $1;
+        $$->paramList.next = NULL;
+    }
+    | Param COMMA ParamList {
+        $$ = createNode(NodeType_ParamList);
+        $$->paramList.param = $1;
+        $$->paramList.next = $3;
+    }
+;
+
+Param:
+    TYPE ID {
+        $$ = createNode(NodeType_Param);
+        $$->param.type = strdup($1);
+        $$->param.name = strdup($2);
+
+        printf("[INFO] Parameter declared: %s %s\n", $1, $2);
     }
 ;
 
 FunctionFooter:
     RBRACE {
+        // Generate TAC for function end
+        generateTAC("FUNC_END", functionBeingParsed, NULL, NULL);
+
         // Exit the function's scope
         exitScope();
 
@@ -233,18 +271,20 @@ Stmt:
             int value = (int)evaluateExpr($3, currentScope);  // Cast to int
             printf("[DEBUG] Assigning value to %s: %d\n", $1, value); // Debug print
             sym->value.intValue = value;
+            char* exprResult = generateExprTAC($3, currentScope);
+            generateTAC("MOV", sym->name, exprResult, NULL);
         } else if (sym->type == TYPE_FLOAT) {
             float value = evaluateExpr($3, currentScope);  // Handle float values
             printf("[DEBUG] Assigning value to %s: %f\n", $1, value); // Debug print
             sym->value.floatValue = value;
+            char* exprResult = generateExprTAC($3, currentScope);
+            generateTAC("MOV", sym->name, exprResult, NULL);
         }
 
         $$ = createNode(NodeType_AssignStmt);
         $$->assignStmt.varName = strdup($1);
         $$->assignStmt.operator = strdup($2);
         $$->assignStmt.expr = $3;
-        $$->assignStmt.isArray = 0; // It's a normal variable
-        $$->assignStmt.arrayIndex = NULL;
 
         printf("[INFO] Assignment statement recognized: %s = ...;\n", $1);
     }
@@ -278,17 +318,20 @@ Stmt:
             sym->value.floatArray[index] = value;  // Store in the float array
         }
 
+        // Generate TAC for the array assignment
+        char* exprResult = generateExprTAC($3, currentScope);
+
         // Generate TAC with the array name and index
         char arrayAccessStr[50];
         sprintf(arrayAccessStr, "%s[%d]", $1->arrayAccess.arrayName, index);  // Create string "arr[0]" format
 
-        // $1 is <ast>, from the ArrayAccess rule above, so $1->arrayAccess.index is ASTNode*.
+        // Use the array access string directly for TAC generation
+        generateTAC("MOV", arrayAccessStr, exprResult, NULL);
+
         $$ = createNode(NodeType_AssignStmt);
         $$->assignStmt.varName = strdup($1->arrayAccess.arrayName);
         $$->assignStmt.operator = strdup($2);
         $$->assignStmt.expr = $3;
-        $$->assignStmt.isArray = 1;
-        $$->assignStmt.arrayIndex = $1->arrayAccess.index; // $1->arrayAccess.index is ASTNode*, matches arrayIndex type.
 
         printf("[INFO] Array assignment recognized: %s[%d] = ...;\n", $1->arrayAccess.arrayName, index);
     }
@@ -311,6 +354,7 @@ Stmt:
         printf("[DEBUG] Write statement detected: write %s\n", id); // Debug print
 
         $$->writeStmt.id = id;
+        generateTAC("WRITE", id, NULL, NULL);
         printf("[INFO] Write statement recognized: write %s;\n", id);
     }
     | ID LPAREN RPAREN SEMICOLON {
@@ -326,6 +370,9 @@ Stmt:
         $$->functionCall.name = strdup($1);
 
         printf("[INFO] Function call recognized: %s();\n", $1);
+
+        // Generate TAC for function call
+        generateTAC("CALL", $1, NULL, NULL);
     }
     | IF LPAREN Expr RPAREN Stmt ELSE Stmt {
         $$ = createNode(NodeType_IfStmt);
@@ -344,6 +391,15 @@ Stmt:
     | LBRACE StmtList RBRACE {
         $$ = $2; // StmtList already represents the list of statements in the block
         printf("[INFO] Block statement recognized.\n");
+    }
+    | RETURN Expr SEMICOLON {
+        $$ = createNode(NodeType_ReturnStmt);
+        $$->returnStmt.expr = $2;
+
+        // Generate TAC for return
+        char* exprResult = generateExprTAC($2, currentScope);
+
+        printf("[INFO] Return statement recognized: return ...;\n");
     }
 ;
 
@@ -413,35 +469,35 @@ Expr:
         $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = strdup("<");
+        $$->expr.operator = strdup(">");
         printf("[INFO] Expression recognized: ... < ...\n");
     }
     | Expr GE Expr {
         $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = strdup(">=");
+        $$->expr.operator = strdup(">");
         printf("[INFO] Expression recognized: ... >= ...\n");
     }
     | Expr LE Expr {
         $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = strdup("<=");
+        $$->expr.operator = strdup(">");
         printf("[INFO] Expression recognized: ... <= ...\n");
     }
     | Expr EQEQ Expr {
         $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = strdup("==");
+        $$->expr.operator = strdup(">");
         printf("[INFO] Expression recognized: ... == ...\n");
     }
     | Expr NEQ Expr {
         $$ = createNode(NodeType_Expr);
         $$->expr.left = $1;
         $$->expr.right = $3;
-        $$->expr.operator = strdup("!=");
+        $$->expr.operator = strdup(">");
         printf("[INFO] Expression recognized: ... != ...\n");
     }
     | ID {
@@ -513,16 +569,6 @@ int main() {
 
         // Print the symbol table for all scopes
         printSymbolTable(scopeListHead);
-
-        // Generate TAC
-        printf("\n----- GENERATED TAC -----\n");
-        TAC* tacHead = generateTAC(root, NULL);
-        printTAC(tacHead);
-
-        // generateMIPS(tacHead, "output.s");
-
-        // Cleanup TAC
-        freeTAC(tacHead);
 
         // Clean up the AST
         if (root != NULL) {

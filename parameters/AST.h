@@ -13,6 +13,7 @@ typedef enum {
     NodeType_FunctionCall,     // Added for function calls
     NodeType_VarDeclList, 
     NodeType_VarDecl,
+    NodeType_ReturnStmt,
     NodeType_IfStmt, 
     NodeType_IntExpr,
     NodeType_FloatExpr,
@@ -48,6 +49,7 @@ typedef struct ASTNode {
 
         struct {
             char* name;
+            struct ASTNode* args; // A list of expressions for arguments
         } functionCall;  // Added for function calls
 
         struct {
@@ -65,6 +67,10 @@ typedef struct ASTNode {
             char* varType;
             char* varName;
         } varDecl;
+
+        struct {
+            struct ASTNode* expr;
+        } returnStmt;
 
         struct {
             int integer;

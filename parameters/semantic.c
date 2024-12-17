@@ -4,7 +4,6 @@
 #include <string.h>
 
 // A helper function to generate unique temporary names.
-// (Optional improvement: you can maintain a global counter.)
 static int tempCounter = 0;
 static char* newTemp() {
     char* buffer = (char*)malloc(20);
@@ -32,20 +31,21 @@ TAC* appendTAC(TAC* head, TAC* newTAC) {
     return head;
 }
 
+// Forward declaration for handling arguments in function calls
+static TAC* generateArgs(ASTNode* args);
+
 TAC* generateTAC(ASTNode* node, char* target) {
     if (!node) return NULL;
     TAC* code = NULL;
 
     switch (node->type) {
         case NodeType_Program:
-            // Traverse children
             code = appendTAC(code, generateTAC(node->program.functionDefList, NULL));
             code = appendTAC(code, generateTAC(node->program.varDeclList, NULL));
             code = appendTAC(code, generateTAC(node->program.stmtList, NULL));
             break;
 
         case NodeType_FunctionDefList:
-            // Generate TAC for function definitions
             code = appendTAC(code, generateTAC(node->functionDefList.functionDef, NULL));
             code = appendTAC(code, generateTAC(node->functionDefList.functionDefList, NULL));
             break;
@@ -56,12 +56,9 @@ TAC* generateTAC(ASTNode* node, char* target) {
             sprintf(funcLabel, "func_%s", node->functionDef.name);
             sprintf(endFuncLabel, "endfunc_%s", node->functionDef.name);
 
-            // Function start label
             code = appendTAC(code, createTAC("label", NULL, NULL, funcLabel));
-            // Generate TAC for varDeclList and stmtList
             code = appendTAC(code, generateTAC(node->functionDef.varDeclList, NULL));
             code = appendTAC(code, generateTAC(node->functionDef.stmtList, NULL));
-            // Function end label
             code = appendTAC(code, createTAC("label", NULL, NULL, endFuncLabel));
             break;
         }
@@ -73,51 +70,27 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
         case NodeType_AssignStmt: {
             if (node->assignStmt.isArray) {
-                // Handle array assignment
                 char* indexTemp = newTemp();
-                TAC* code = generateTAC(node->assignStmt.arrayIndex, indexTemp);
-                // Evaluate the RHS
+                code = appendTAC(code, generateTAC(node->assignStmt.arrayIndex, indexTemp));
                 char* rhsTemp = newTemp();
                 code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTemp));
-                // Generate store instruction
                 code = appendTAC(code, createTAC("store", rhsTemp, indexTemp, node->assignStmt.varName));
-                return code;
             } else {
-                // Normal variable assignment
                 char* rhsTarget = target ? strdup(target) : newTemp();
-                TAC* code = generateTAC(node->assignStmt.expr, rhsTarget);
+                code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTarget));
                 code = appendTAC(code, createTAC("=", rhsTarget, NULL, node->assignStmt.varName));
-                return code;
             }
+            break;
         }
 
         case NodeType_Expr: {
-            // If it's a comparison operator, we need to evaluate it into a boolean (0/1)
-            // Let's assume node->expr.operator is the actual operator from the code (==, !=, <, etc.)
-            // We'll produce tCond = (tL operator tR), resulting in 0 or 1. Then the IfStmt uses that tCond.
-            // For arithmetic ops, just do arithmetic.
-
             char* lhsTemp = newTemp();
             char* rhsTemp = newTemp();
             code = appendTAC(code, generateTAC(node->expr.left, lhsTemp));
             code = appendTAC(code, generateTAC(node->expr.right, rhsTemp));
 
             char* resultTemp = target ? target : newTemp();
-            // Check if operator is comparison:
-            if (strcmp(node->expr.operator, "==") == 0 ||
-                strcmp(node->expr.operator, "!=") == 0 ||
-                strcmp(node->expr.operator, "<") == 0 ||
-                strcmp(node->expr.operator, "<=") == 0 ||
-                strcmp(node->expr.operator, ">") == 0 ||
-                strcmp(node->expr.operator, ">=") == 0) {
-                // Generate a comparison instruction:
-                // We'll just do resultTemp = lhsTemp operator rhsTemp (1 or 0)
-                // In a real compiler, you'd need a separate instruction to set a boolean result.
-                code = appendTAC(code, createTAC(node->expr.operator, lhsTemp, rhsTemp, resultTemp));
-            } else {
-                // Arithmetic operator
-                code = appendTAC(code, createTAC(node->expr.operator, lhsTemp, rhsTemp, resultTemp));
-            }
+            code = appendTAC(code, createTAC(node->expr.operator, lhsTemp, rhsTemp, resultTemp));
             break;
         }
 
@@ -162,24 +135,23 @@ TAC* generateTAC(ASTNode* node, char* target) {
             code = appendTAC(code, generateTAC(node->ifStmt.condition, condTemp));
 
             char* labelThen = strdup("L_then");
-            // char* labelElse = strdup("L_else");
             char* labelEnd = strdup("L_end");
-
-            // if condTemp == 1 goto L_then
-            // We'll assume condTemp holds a boolean result (1/0).
-            // In a real compiler, you might need a special instruction. For simplicity:
             code = appendTAC(code, createTAC("if", condTemp, NULL, labelThen));
 
-            // else part
             if (node->ifStmt.elseStmt) {
                 code = appendTAC(code, generateTAC(node->ifStmt.elseStmt, NULL));
             }
             code = appendTAC(code, createTAC("goto", NULL, NULL, labelEnd));
-
             code = appendTAC(code, createTAC("label", NULL, NULL, labelThen));
             code = appendTAC(code, generateTAC(node->ifStmt.thenStmt, NULL));
-
             code = appendTAC(code, createTAC("label", NULL, NULL, labelEnd));
+            break;
+        }
+
+        case NodeType_ReturnStmt: {
+            char* retTemp = newTemp();
+            code = appendTAC(code, generateTAC(node->returnStmt.expr, retTemp));
+            code = appendTAC(code, createTAC("return", retTemp, NULL, NULL));
             break;
         }
 
@@ -193,10 +165,29 @@ TAC* generateTAC(ASTNode* node, char* target) {
             // No TAC for variable/array declarations (just skip)
             break;
 
-        case NodeType_FunctionCall:
-            // call funcName
-            code = appendTAC(code, createTAC("call", node->functionCall.name, NULL, NULL));
+        case NodeType_FunctionCall: {
+            // Generate args
+            TAC* argCode = NULL;
+            ASTNode* argList = node->functionCall.args;
+            int argCount=0;
+            while (argList && argList->type == NodeType_StmtList) {
+                ASTNode* singleArg = argList->stmtList.stmt;
+                char* argTemp = newTemp();
+                argCode = appendTAC(argCode, generateTAC(singleArg, argTemp));
+                // param argTemp
+                argCode = appendTAC(argCode, createTAC("param", argTemp, NULL, NULL));
+                argList = argList->stmtList.stmtList;
+                argCount++;
+            }
+            code = appendTAC(code, argCode);
+
+            // If function returns a value in expressions, store in target
+            char* resultTemp = target ? target : NULL; 
+            // If resultTemp is NULL, means we don't need the return value
+            code = appendTAC(code, createTAC("call", node->functionCall.name, NULL, resultTemp));
+
             break;
+        }
 
         default:
             printf("[DEBUG] No TAC generation for node type: %s\n", nodeTypeToString(node->type));
@@ -207,28 +198,24 @@ TAC* generateTAC(ASTNode* node, char* target) {
 }
 
 
-// Print the TAC
 void printTAC(TAC* tac) {
     TAC* current = tac;
     while (current) {
         if (current->operator && strcmp(current->operator, "=") == 0) {
-            // Assignment: result = arg1
             printf("%s = %s\n", current->result, current->arg1);
         } else if (current->operator && 
                   (strcmp(current->operator, "+") == 0 ||
                    strcmp(current->operator, "-") == 0 ||
                    strcmp(current->operator, "*") == 0 ||
                    strcmp(current->operator, "/") == 0)) {
-            // Binary operation: result = arg1 operator arg2
             printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
-        } else if (current->operator && 
+        } else if (current->operator &&
                    (strcmp(current->operator, "==") == 0 ||
                     strcmp(current->operator, "!=") == 0 ||
                     strcmp(current->operator, "<") == 0 ||
                     strcmp(current->operator, "<=") == 0 ||
                     strcmp(current->operator, ">") == 0 ||
                     strcmp(current->operator, ">=") == 0)) {
-            // Comparison: result = arg1 op arg2
             printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
         } else if (current->operator && strcmp(current->operator, "write") == 0) {
             printf("write %s\n", current->arg1);
@@ -245,10 +232,17 @@ void printTAC(TAC* tac) {
         } else if (current->operator && strcmp(current->operator, "label") == 0) {
             printf("%s:\n", current->result);
         } else if (current->operator && strcmp(current->operator, "call") == 0) {
-            printf("call %s\n", current->arg1);
+            if (current->result) {
+                printf("%s = call %s\n", current->result, current->arg1);
+            } else {
+                printf("call %s\n", current->arg1);
+            }
         } else if (current->operator && strcmp(current->operator, "store") == 0) {
-            // store arg1 (value), result[arg2]
             printf("store %s, %s[%s]\n", current->arg1, current->result, current->arg2);
+        } else if (current->operator && strcmp(current->operator,"return")==0) {
+            printf("return %s\n", current->arg1);
+        } else if (current->operator && strcmp(current->operator,"param")==0) {
+            printf("param %s\n", current->arg1);
         } else {
             // Fallback
             printf("%s = %s %s %s\n",
@@ -257,12 +251,10 @@ void printTAC(TAC* tac) {
                    current->operator ? current->operator : "",
                    current->arg2 ? current->arg2 : "");
         }
-
         current = current->next;
     }
 }
 
-// Free the TAC linked list
 void freeTAC(TAC* tac) {
     while (tac) {
         TAC* temp = tac;

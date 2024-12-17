@@ -29,6 +29,7 @@ const char* nodeTypeToString(NodeType type) {
         case NodeType_ArrayDecl: return "Array Declaration";
         case NodeType_ArrayAccess: return "Array Access";
         case NodeType_IfStmt: return "If Statement";
+        case NodeType_ReturnStmt: return "Return Statement";
         default: return "Unknown";
     }
 }
@@ -59,6 +60,12 @@ void traverseAST(ASTNode* node, int level) {
             break;
         case NodeType_FunctionCall:
             printf(": %s()  // Function Call\n", node->functionCall.name);
+            if (node->functionCall.args) {
+                printIndent(level + 1);
+                printf("|-- Arguments:\n");
+                // node->functionCall.args is a StmtList representing arguments as expressions
+                traverseAST(node->functionCall.args, level + 2);
+            }
             break;
         case NodeType_VarDeclList:
             printf("\n");
@@ -115,6 +122,12 @@ void traverseAST(ASTNode* node, int level) {
                 traverseAST(node->ifStmt.elseStmt, level + 2);
             }
             break;
+        case NodeType_ReturnStmt:
+            printf("\n");
+            printIndent(level + 1);
+            printf("|-- return expr:\n");
+            traverseAST(node->returnStmt.expr, level + 2);
+            break;
         default:
             printf(" (Unknown node type)\n");
             break;
@@ -141,6 +154,7 @@ void freeAST(ASTNode* node) {
             break;
         case NodeType_FunctionCall:
             free(node->functionCall.name);
+            freeAST(node->functionCall.args); // Free argument list
             break;
         case NodeType_VarDeclList:
             freeAST(node->varDeclList.varDecl);
@@ -191,6 +205,9 @@ void freeAST(ASTNode* node) {
                 freeAST(node->ifStmt.elseStmt);
             }
             break;
+        case NodeType_ReturnStmt:
+            freeAST(node->returnStmt.expr);
+            break;
     }
 
     free(node);
@@ -224,6 +241,7 @@ ASTNode* createNode(NodeType type) {
             break;
         case NodeType_FunctionCall:
             newNode->functionCall.name = NULL;
+            newNode->functionCall.args = NULL; // Initialize args to NULL
             break;
         case NodeType_VarDeclList:
             newNode->varDeclList.varDecl = NULL;
@@ -272,6 +290,9 @@ ASTNode* createNode(NodeType type) {
             newNode->ifStmt.condition = NULL;
             newNode->ifStmt.thenStmt = NULL;
             newNode->ifStmt.elseStmt = NULL;
+            break;
+        case NodeType_ReturnStmt:
+            newNode->returnStmt.expr = NULL;
             break;
     }
 

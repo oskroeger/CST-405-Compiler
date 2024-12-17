@@ -37,6 +37,7 @@ char* functionBeingParsed = NULL;
 %code requires {
     typedef struct {
         char* name;
+        struct ASTNode* paramList; // Add paramList here
     } FunctionHeaderInfo;
 }
 
@@ -49,6 +50,7 @@ char* functionBeingParsed = NULL;
             exit(EXIT_FAILURE);
         }
         header->name = strdup(name);
+        header->paramList = NULL; // Initially no parameters
         return header;
     }
 }
@@ -66,6 +68,7 @@ char* functionBeingParsed = NULL;
 %token <string> TYPE
 %token <string> ID
 %token <character> SEMICOLON
+%token <character> COMMA
 %token <operator> EQ
 %token <operator> PLUS
 %token <operator> MINUS
@@ -87,6 +90,7 @@ char* functionBeingParsed = NULL;
 
 %type <ast> Program VarDecl VarDeclList Stmt StmtList Expr ArrayAccess FunctionDef FunctionDefList
 %type <funcHeader> FunctionHeader
+%type <ast> Param ParamList ParamListTail ArgList ArgListTail
 %start Program
 
 %%
@@ -126,6 +130,21 @@ FunctionDef:
         // Add function to symbol table
         addFunctionSymbol(symTab, $1->name);
 
+        // Merge paramList (if any) into varDeclList
+        if ($1->paramList != NULL) {
+            if ($2 == NULL) {
+                $$->functionDef.varDeclList = $1->paramList;
+            } else {
+                // Append $2 at the end of $1->paramList
+                ASTNode* paramTail = $1->paramList;
+                while (paramTail->varDeclList.varDeclList != NULL) {
+                    paramTail = paramTail->varDeclList.varDeclList;
+                }
+                paramTail->varDeclList.varDeclList = $2;
+                $$->functionDef.varDeclList = $1->paramList;
+            }
+        }
+
         printf("[INFO] Function defined: %s\n", $1->name);
 
         // Clean up
@@ -135,7 +154,7 @@ FunctionDef:
 ;
 
 FunctionHeader:
-    FUNCTION ID LPAREN RPAREN LBRACE {
+    FUNCTION ID LPAREN ParamList RPAREN LBRACE {
         $$ = createFunctionHeader($2);
 
         // Set the global functionBeingParsed
@@ -143,6 +162,26 @@ FunctionHeader:
 
         // Enter a new scope for the function
         enterScope();
+
+        // Add parameters to symbol table
+        ASTNode* paramNode = $4; 
+        $$->paramList = $4; // Store paramList in FunctionHeaderInfo
+        while (paramNode != NULL && paramNode->type == NodeType_VarDeclList) {
+            ASTNode* singleParam = paramNode->varDeclList.varDecl;
+            if (singleParam && singleParam->type == NodeType_VarDecl) {
+                SymbolValue value;
+                SymbolType st = TYPE_UNKNOWN;
+                if (strcmp(singleParam->varDecl.varType, "int") == 0) {
+                    st = TYPE_INT;
+                    value.intValue = INT_MIN;
+                } else if (strcmp(singleParam->varDecl.varType, "float") == 0) {
+                    st = TYPE_FLOAT;
+                    value.floatValue = FLT_MIN;
+                }
+                addSymbol(currentScope, singleParam->varDecl.varName, st, value);
+            }
+            paramNode = paramNode->varDeclList.varDeclList;
+        }
     }
 ;
 
@@ -153,6 +192,70 @@ FunctionFooter:
 
         // Reset the global functionBeingParsed
         functionBeingParsed = NULL;
+    }
+;
+
+ParamList:
+    /* empty */ {
+        $$ = NULL; // No params
+    }
+    | Param ParamListTail {
+        if ($2 == NULL) {
+            $$ = createNode(NodeType_VarDeclList);
+            $$->varDeclList.varDecl = $1; 
+            $$->varDeclList.varDeclList = NULL;
+        } else {
+            $$ = createNode(NodeType_VarDeclList);
+            $$->varDeclList.varDecl = $1;
+            $$->varDeclList.varDeclList = $2;
+        }
+    }
+;
+
+ParamListTail:
+    /* empty */ { $$ = NULL; }
+    | COMMA Param ParamListTail {
+        ASTNode* newList = createNode(NodeType_VarDeclList);
+        newList->varDeclList.varDecl = $2;
+        newList->varDeclList.varDeclList = $3;
+        $$ = newList;
+    }
+;
+
+Param:
+    TYPE ID {
+        $$ = createNode(NodeType_VarDecl);
+        $$->varDecl.varType = strdup($1);
+        $$->varDecl.varName = strdup($2);
+    }
+;
+
+ArgList:
+    /* empty */ {
+        $$ = NULL;
+    }
+    | Expr ArgListTail {
+        // If there is just one expr
+        if ($2 == NULL) {
+            $$ = createNode(NodeType_StmtList); // Reuse StmtList or create a new node type for arguments
+            $$->stmtList.stmt = $1;
+            $$->stmtList.stmtList = NULL;
+        } else {
+            // $2 is another list, chain them
+            $$ = createNode(NodeType_StmtList);
+            $$->stmtList.stmt = $1;
+            $$->stmtList.stmtList = $2;
+        }
+    }
+;
+
+ArgListTail:
+    /* empty */ { $$ = NULL; }
+    | COMMA Expr ArgListTail {
+        ASTNode* newList = createNode(NodeType_StmtList);
+        newList->stmtList.stmt = $2;
+        newList->stmtList.stmtList = $3;
+        $$ = newList;
     }
 ;
 
@@ -313,19 +416,18 @@ Stmt:
         $$->writeStmt.id = id;
         printf("[INFO] Write statement recognized: write %s;\n", id);
     }
-    | ID LPAREN RPAREN SEMICOLON {
-        // Function call statement
+    | ID LPAREN ArgList RPAREN SEMICOLON {
         Symbol* sym = lookupSymbol(currentScope, $1);
         if (sym == NULL || sym->type != TYPE_FUNCTION) {
             fprintf(stderr, "Error: Undeclared function '%s' called at line %d.\n", $1, yylineno);
             parseErrorFlag = 1;
             YYABORT;
         }
-
         $$ = createNode(NodeType_FunctionCall);
         $$->functionCall.name = strdup($1);
-
-        printf("[INFO] Function call recognized: %s();\n", $1);
+        $$->functionCall.args = $3;
+        // This represents a function call as a statement (no return value used)
+        printf("[INFO] Function call statement recognized: %s(...);\n", $1);
     }
     | IF LPAREN Expr RPAREN Stmt ELSE Stmt {
         $$ = createNode(NodeType_IfStmt);
@@ -344,6 +446,11 @@ Stmt:
     | LBRACE StmtList RBRACE {
         $$ = $2; // StmtList already represents the list of statements in the block
         printf("[INFO] Block statement recognized.\n");
+    }
+    | RETURN Expr SEMICOLON {
+        $$ = createNode(NodeType_ReturnStmt);
+        $$->returnStmt.expr = $2;
+        printf("[INFO] Return statement recognized.\n");
     }
 ;
 
@@ -471,6 +578,12 @@ Expr:
     }
     | ArrayAccess {
         $$ = $1;
+    }
+    | ID LPAREN ArgList RPAREN {
+        $$ = createNode(NodeType_FunctionCall);
+        $$->functionCall.name = strdup($1);
+        $$->functionCall.args = $3; // ArgList AST node
+        printf("[INFO] Function call expression recognized: %s(...)\n", $1);
     }
 ;
 
