@@ -1,0 +1,40 @@
+function one() {
+    int x;
+    x = 5;
+    write x;
+}
+
+function two() {
+    float arr[2];
+    float x;
+    int arr2[2];
+    int y;
+
+    arr[0] = 4.0 + 5.6;
+    arr[1] = 3.3 * 2.0;
+
+    x = arr[0] + arr[1];
+
+    arr2[0] = 1;
+    arr2[1] = 4;
+
+    y = 5 * (arr2[0] + arr2[1]);
+
+    write x;
+    write y;
+}
+
+int x;
+int count;
+x = 4;
+write x;
+
+two();
+one();
+
+count =1;
+
+while (count == 1 ) {
+    write count;
+    count = 2;
+ }
