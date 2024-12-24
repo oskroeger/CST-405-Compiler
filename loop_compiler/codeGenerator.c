@@ -1,271 +1,355 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "semantic.h"  // for TAC definition
+#include "semantic.h" // for TAC definition
 
-/**************************************
- * Helpers
- **************************************/
+// --------------------------------------------------------------------------
+// 1) Data structures for register/spill management
+// --------------------------------------------------------------------------
 
-// Map "t<number>" => "$t0..$t9" by (number % 10).
-// If it's not "t<number>", return NULL => treat as global or immediate.
-static const char* mapTempToReg(const char* name) {
-    if (!name) return NULL;
-    if (name[0] != 't') return NULL;  // e.g. "x" => not a temp
-    int index = atoi(name + 1);
-    int regNum = index % 10;
-    static char reg[8];
-    sprintf(reg, "$t%d", regNum);
-    return strdup(reg);
-}
+// We'll track each distinct TAC temp in a table up to some limit.
+// If we run out of "real" registers, we spill to a label in .data
+// For real compilers, you'd do liveness analysis + stack-based spills, etc.
 
-// Convert a user variable name "x" => "var_x".
-static char* makeGlobalName(const char* var) {
-    if (!var) return NULL;
-    // If it's a TAC temp "t<number>", do NOT rename:
-    if (var[0] == 't') {
-        int allDigits = 1;
-        for (int i = 1; var[i] != '\0'; i++) {
-            if (var[i] < '0' || var[i] > '9') {
-                allDigits = 0;
-                break;
-            }
-        }
-        if (allDigits) {
-            // It's a temp => do not rename
-            return strdup(var);
+#define MAX_REGS 10  // number of MIPS registers we'll use for temps ($t0..$t9)
+#define MAX_TEMPS 200
+
+typedef struct {
+    char* tempName;        // e.g. "t6"
+    const char* assignedReg;   // e.g. "$t3" or NULL if spilled
+    int spilled;           // 0 = in register, 1 = spilled to memory
+} TempBinding;
+
+static TempBinding g_tempBindings[MAX_TEMPS];
+static int g_numTempBindings = 0;
+
+// Next free register index in [0..MAX_REGS-1]
+static int g_nextRegIndex = 0;
+
+// We'll store the names of user-defined variables and spilled temps
+// so we can declare them in .data later.
+static char g_globalNames[500][64];
+static int g_numGlobals = 0;
+
+// Helper to see if a name is already in g_globalNames
+static int isGlobalKnown(const char* name) {
+    for (int i = 0; i < g_numGlobals; i++) {
+        if (!strcmp(g_globalNames[i], name)) {
+            return 1; // found
         }
     }
-    // Otherwise, prepend "var_"
+    return 0;
+}
+
+// Add a name to the global or spilled set
+static void addGlobalName(const char* name) {
+    if (!name) return;
+    if (isGlobalKnown(name)) return;
+    strcpy(g_globalNames[g_numGlobals++], name);
+}
+
+// Return 1 if `str` is "t<number>", else 0
+static int isTempName(const char* str) {
+    if (!str) return 0;
+    if (str[0] != 't') return 0;
+    // check digits
+    for (int i = 1; str[i]; i++) {
+        if (str[i] < '0' || str[i] > '9') {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+// Return the binding for a tempName, or NULL if not found
+static TempBinding* lookupBinding(const char* tempName) {
+    for (int i = 0; i < g_numTempBindings; i++) {
+        if (!strcmp(g_tempBindings[i].tempName, tempName)) {
+            return &g_tempBindings[i];
+        }
+    }
+    return NULL;
+}
+
+// Assign a fresh register or spill
+// - If we still have free registers, assign one
+// - Otherwise mark spilled=1
+static void allocateBinding(const char* tempName) {
+    if (g_numTempBindings >= MAX_TEMPS) {
+        fprintf(stderr, "[ERROR] Too many distinct temps\n");
+        exit(1);
+    }
+
+    g_tempBindings[g_numTempBindings].tempName = strdup(tempName);
+    g_tempBindings[g_numTempBindings].assignedReg = NULL;
+    g_tempBindings[g_numTempBindings].spilled = 0;
+
+    // If we still have free regs, assign one
+    if (g_nextRegIndex < MAX_REGS) {
+        // assign $t<g_nextRegIndex>
+        static char regNameBuf[8];
+        sprintf(regNameBuf, "$t%d", g_nextRegIndex);
+        g_tempBindings[g_numTempBindings].assignedReg = strdup(regNameBuf);
+        g_tempBindings[g_numTempBindings].spilled = 0;
+        g_nextRegIndex++;
+    } else {
+        // Spill
+        g_tempBindings[g_numTempBindings].assignedReg = NULL;
+        g_tempBindings[g_numTempBindings].spilled = 1;
+
+        // Mark that we need "var_tXX" in .data
+        char labelBuf[64];
+        sprintf(labelBuf, "var_%s", tempName);
+        addGlobalName(labelBuf);
+    }
+
+    g_numTempBindings++;
+}
+
+// Return the register if the temp is in a register, or NULL if spilled
+static const char* getRegIfAny(const char* tempName) {
+    TempBinding* b = lookupBinding(tempName);
+    if (!b) return NULL;
+    if (b->spilled) return NULL;
+    return b->assignedReg;  // e.g. "$t3"
+}
+
+// Return 1 if the given temp is spilled, else 0
+static int isSpilled(const char* tempName) {
+    TempBinding* b = lookupBinding(tempName);
+    if (!b) return 0;
+    return b->spilled;
+}
+
+// Return label name for a spilled temp, e.g. "var_t6"
+static char* getSpillLabel(const char* tempName) {
+    char* buf = (char*)malloc(64);
+    sprintf(buf, "var_%s", tempName);
+    return buf;
+}
+
+// For user-defined variables like "x", we store them as "var_x" in .data
+// But we only do that if it's not recognized as a temp
+static char* makeGlobalName(const char* var) {
+    if (!var) return NULL;
+    if (isTempName(var)) {
+        // The "spilled" mechanism handles those
+        if (isSpilled(var)) {
+            return getSpillLabel(var);
+        } else {
+            // It's a temp in a register => no global name needed
+            return NULL;
+        }
+    }
+    // Non-temp => user variable => "var_x"
     char* buf = (char*)malloc(strlen(var) + 5);
     sprintf(buf, "var_%s", var);
     return buf;
 }
 
-/*
- * We'll gather all global variables from TAC instructions where:
- *   1) operator is "=" and result is not a temp
- *   2) operator is "write" and arg1 is not a temp
- * Then we create ".word 0" entries for each one in .data.
- */
-static void collectGlobalVars(TAC* tac, FILE* out) {
-    fprintf(out, ".data\n");
-    // Keep track of which variable names we've seen so we don't duplicate.
-    // In a real system, you'd use a dynamic structure; for simplicity, we do a small array.
-    char seen[100][64];
-    int seenCount = 0;
+// --------------------------------------------------------------------------
+// 2) The "public" function to retrieve a register or spill a temp
+// --------------------------------------------------------------------------
 
+static void ensureTempBinding(const char* name) {
+    if (!name) return;
+    if (!isTempName(name)) {
+        // user variable or immediate => no binding
+        return;
+    }
+    TempBinding* b = lookupBinding(name);
+    if (!b) {
+        allocateBinding(name);
+    }
+}
+
+// --------------------------------------------------------------------------
+// 3) collectGlobalVars
+// --------------------------------------------------------------------------
+
+static void collectGlobalVars(TAC* tac, FILE* out) {
+    // 1) Ensure we allocate bindings for all temps
     for (TAC* c = tac; c; c = c->next) {
-        const char* op = (c->operator ? c->operator : "");
-        // Case 1: "result = arg1"
+        if (c->arg1) ensureTempBinding(c->arg1);
+        if (c->arg2) ensureTempBinding(c->arg2);
+        if (c->result) ensureTempBinding(c->result);
+    }
+
+    // 2) For each instruction, if there's a user-defined var, add to .data
+    for (TAC* c = tac; c; c = c->next) {
+        const char* op = c->operator ? c->operator : "";
+        
+        // For assignment or write/load, etc.
         if (!strcmp(op, "=") && c->result) {
-            const char* maybeReg = mapTempToReg(c->result);
-            if (!maybeReg) {
-                // It's a global var (like "x") => track it
-                int already = 0;
-                for (int i = 0; i < seenCount; i++) {
-                    if (!strcmp(seen[i], c->result)) {
-                        already = 1;
-                        break;
-                    }
-                }
-                if (!already) {
-                    strcpy(seen[seenCount++], c->result);
-                }
+            if (!isTempName(c->result)) {
+                char* g = makeGlobalName(c->result);
+                if (g) { addGlobalName(g); free(g); }
             }
         }
-        // Case 2: "write arg1"
         if (!strcmp(op, "write") && c->arg1) {
-            const char* maybeReg = mapTempToReg(c->arg1);
-            if (!maybeReg) {
-                int already = 0;
-                for (int i = 0; i < seenCount; i++) {
-                    if (!strcmp(seen[i], c->arg1)) {
-                        already = 1;
-                        break;
-                    }
-                }
-                if (!already) {
-                    strcpy(seen[seenCount++], c->arg1);
-                }
+            if (!isTempName(c->arg1)) {
+                char* g = makeGlobalName(c->arg1);
+                if (g) { addGlobalName(g); free(g); }
+            }
+        }
+        if (!strcmp(op, "load") && c->arg1) {
+            if (!isTempName(c->arg1)) {
+                char* g = makeGlobalName(c->arg1);
+                if (g) { addGlobalName(g); free(g); }
+            }
+        }
+        // For +, -, *, / => check if arg1/arg2/result are user variables
+        if (!strcmp(op, "+") || !strcmp(op, "-") ||
+            !strcmp(op, "*") || !strcmp(op, "/")) {
+            if (c->arg1 && !isTempName(c->arg1)) {
+                char* g = makeGlobalName(c->arg1);
+                if (g) { addGlobalName(g); free(g); }
+            }
+            if (c->arg2 && !isTempName(c->arg2)) {
+                char* g = makeGlobalName(c->arg2);
+                if (g) { addGlobalName(g); free(g); }
+            }
+            if (c->result && !isTempName(c->result)) {
+                char* g = makeGlobalName(c->result);
+                if (g) { addGlobalName(g); free(g); }
             }
         }
     }
 
-    // Now emit each var as "var_x: .word 0"
-    for (int i = 0; i < seenCount; i++) {
-        char* safeName = makeGlobalName(seen[i]);
-        fprintf(out, "%s: .word 0\n", safeName);
-        free(safeName);
+    // 3) Emit .data
+    fprintf(out, ".data\n");
+    for (int i = 0; i < g_numGlobals; i++) {
+        fprintf(out, "%s: .word 0\n", g_globalNames[i]);
     }
     fprintf(out, "\n.text\n");
 }
 
-/*
- * Main code generator:
- *   - We produce .data for global variables
- *   - Then we produce "main:" (assuming a single program)
- *   - For each TAC instruction, we handle only =, +, -, *, /, and write
- *   - We do a final "li $v0, 10 ; syscall" at the end
- */
+// --------------------------------------------------------------------------
+// 4) Load/store helpers
+// --------------------------------------------------------------------------
+
+static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
+    if (!arg) return scratch;
+    // 1) integer literal?
+    char* endp;
+    long val = strtol(arg, &endp, 10);
+    if (*endp == '\0') {
+        // immediate
+        fprintf(out, "li %s, %ld\n", scratch, val);
+        return scratch;
+    }
+
+    // 2) temp?
+    if (isTempName(arg)) {
+        const char* r = getRegIfAny(arg);
+        if (r) {
+            // in register => move scratch, r
+            fprintf(out, "move %s, %s\n", scratch, r);
+            return scratch;
+        } else if (isSpilled(arg)) {
+            // spilled => la $s7, var_tXX / lw scratch, 0($s7)
+            char* spillLabel = getSpillLabel(arg);
+            fprintf(out, "la $s7, %s\n", spillLabel);
+            fprintf(out, "lw %s, 0($s7)\n", scratch);
+            free(spillLabel);
+            return scratch;
+        }
+    }
+
+    // 3) user variable => var_x
+    char* g = makeGlobalName(arg);
+    if (g) {
+        fprintf(out, "la $s7, %s\n", g);
+        fprintf(out, "lw %s, 0($s7)\n", scratch);
+        free(g);
+    }
+    return scratch;
+}
+
+static void storeResult(const char* dest, const char* srcReg, FILE* out) {
+    if (!dest) return;
+
+    if (isTempName(dest)) {
+        const char* r = getRegIfAny(dest);
+        if (r) {
+            // move r, srcReg
+            fprintf(out, "move %s, %s\n", r, srcReg);
+            return;
+        } else if (isSpilled(dest)) {
+            char* spillLabel = getSpillLabel(dest);
+            fprintf(out, "la $s7, %s\n", spillLabel);
+            fprintf(out, "sw %s, 0($s7)\n", srcReg);
+            free(spillLabel);
+            return;
+        }
+    }
+
+    // else => user var "var_x"
+    char* g = makeGlobalName(dest);
+    if (g) {
+        fprintf(out, "la $s7, %s\n", g);
+        fprintf(out, "sw %s, 0($s7)\n", srcReg);
+        free(g);
+    }
+}
+
+// --------------------------------------------------------------------------
+// 5) Main code generator
+// --------------------------------------------------------------------------
+
 void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
+    fprintf(stderr, "DEBUG: Using the FIXED code generator!\n");
     FILE* out = fopen(outputFilename, "w");
     if (!out) {
-        fprintf(stderr, "[ERROR] Could not open %s for writing MIPS code\n", outputFilename);
+        fprintf(stderr, "[ERROR] Could not open %s\n", outputFilename);
         return;
     }
 
-    // 1) Emit .data for all global variables we find
+    // Reset global state
+    g_numTempBindings = 0;
+    g_nextRegIndex = 0;
+    g_numGlobals = 0;
+
+    // 1) Collect global vars + do register assignment/spilling
     collectGlobalVars(tacHead, out);
 
-    // 2) Start .text and define main
+    // 2) Start main
     fprintf(out, ".globl main\n");
     fprintf(out, "main:\n");
 
-    // 3) Process each TAC
+    // 3) Emit code for each TAC
     for (TAC* c = tacHead; c; c = c->next) {
-        const char* op = (c->operator ? c->operator : "");
+        const char* op = c->operator ? c->operator : "";
 
-        // (a) handle "result = arg1"
         if (!strcmp(op, "=")) {
-            const char* rd = mapTempToReg(c->result);   // destination register, if any
-            // parse arg1 => check if it's an integer literal
-            char* endp;
-            long val = strtol(c->arg1, &endp, 10);
-            if (*endp == '\0') {
-                // arg1 is an integer literal
-                if (rd) {
-                    // e.g. "li $t0, 4"
-                    fprintf(out, "li %s, %ld\n", rd, val);
-                } else {
-                    // store to a global var => "li $t0, val; sw $t0, var_..."
-                    fprintf(out, "li $t0, %ld\n", val);
-                    char* g = makeGlobalName(c->result);
-                    fprintf(out, "la $t9, %s\n", g);
-                    fprintf(out, "sw $t0, 0($t9)\n");
-                    free(g);
-                }
-            } else {
-                // not an integer => could be a temp or another global
-                const char* rs = mapTempToReg(c->arg1);
-                if (rs) {
-                    // arg1 is a register temp
-                    if (rd) {
-                        // both sides are temps => "move rd, rs"
-                        fprintf(out, "move %s, %s\n", rd, rs);
-                    } else {
-                        // result is global => "sw rs, var_..."
-                        char* gRes = makeGlobalName(c->result);
-                        fprintf(out, "la $t9, %s\n", gRes);
-                        fprintf(out, "sw %s, 0($t9)\n", rs);
-                        free(gRes);
-                    }
-                } else {
-                    // arg1 is global => load it => store
-                    char* gArg = makeGlobalName(c->arg1);
-                    if (rd) {
-                        // load into register
-                        fprintf(out, "la $t9, %s\n", gArg);
-                        fprintf(out, "lw %s, 0($t9)\n", rd);
-                    } else {
-                        // global=global => use $t0 as scratch
-                        fprintf(out, "la $t9, %s\n", gArg);
-                        fprintf(out, "lw $t0, 0($t9)\n");
-                        char* gRes = makeGlobalName(c->result);
-                        fprintf(out, "la $t9, %s\n", gRes);
-                        fprintf(out, "sw $t0, 0($t9)\n");
-                        free(gRes);
-                    }
-                    free(gArg);
-                }
-            }
+            // result = arg1
+            loadArg(c->arg1, "$t0", out);
+            storeResult(c->result, "$t0", out);
         }
-
-        // (b) handle "result = arg1 op arg2" for +, -, *, /
         else if (!strcmp(op, "+") || !strcmp(op, "-") ||
-                 !strcmp(op, "*") || !strcmp(op, "/")) {
-            const char* rd = mapTempToReg(c->result);
-            if (!rd) {
-                fprintf(out, "# error: result %s is not a temp for arithmetic.\n", c->result);
-                continue;
-            }
-            // load arg1 => $t1
-            char* endp;
-            long val = strtol(c->arg1, &endp, 10);
-            if (*endp == '\0') {
-                // integer
-                fprintf(out, "li $t1, %ld\n", val);
-            } else {
-                // either temp or global
-                const char* rs = mapTempToReg(c->arg1);
-                if (rs) {
-                    fprintf(out, "move $t1, %s\n", rs);
-                } else {
-                    char* gArg1 = makeGlobalName(c->arg1);
-                    fprintf(out, "la $t9, %s\n", gArg1);
-                    fprintf(out, "lw $t1, 0($t9)\n");
-                    free(gArg1);
-                }
-            }
-            // load arg2 => $t2
-            char* endp2;
-            long val2 = strtol(c->arg2, &endp2, 10);
-            if (*endp2 == '\0') {
-                // integer
-                fprintf(out, "li $t2, %ld\n", val2);
-            } else {
-                // temp or global
-                const char* rt = mapTempToReg(c->arg2);
-                if (rt) {
-                    fprintf(out, "move $t2, %s\n", rt);
-                } else {
-                    char* gArg2 = makeGlobalName(c->arg2);
-                    fprintf(out, "la $t9, %s\n", gArg2);
-                    fprintf(out, "lw $t2, 0($t9)\n");
-                    free(gArg2);
-                }
-            }
+                 !strcmp(op, "*") || !strcmp(op, "/")) 
+        {
+            // result = arg1 op arg2
+            loadArg(c->arg1, "$t1", out);  // left in $t1
+            loadArg(c->arg2, "$t2", out);  // right in $t2
 
-            // do the operation => store in rd
             if (!strcmp(op, "+")) {
-                fprintf(out, "add %s, $t1, $t2\n", rd);
+                fprintf(out, "add $t0, $t1, $t2\n");
             } else if (!strcmp(op, "-")) {
-                fprintf(out, "sub %s, $t1, $t2\n", rd);
+                fprintf(out, "sub $t0, $t1, $t2\n");
             } else if (!strcmp(op, "*")) {
-                fprintf(out, "mul %s, $t1, $t2\n", rd);
-            } else {
-                // "/"
+                fprintf(out, "mul $t0, $t1, $t2\n");
+            } else if (!strcmp(op, "/")) {
                 fprintf(out, "div $t1, $t2\n");
-                fprintf(out, "mflo %s\n", rd);
+                fprintf(out, "mflo $t0\n");
             }
+            // store into result
+            storeResult(c->result, "$t0", out);
         }
-
-        // (c) handle "write arg1"
         else if (!strcmp(op, "write")) {
-            // if arg1 is a temp => move $a0, that
-            // else if int => li => move
-            // else if global => lw => move
-            const char* rs = mapTempToReg(c->arg1);
-            if (rs) {
-                fprintf(out, "move $a0, %s\n", rs);
-            } else {
-                // maybe an integer or a global
-                char* endp;
-                long val = strtol(c->arg1, &endp, 10);
-                if (*endp == '\0') {
-                    // immediate
-                    fprintf(out, "li $t0, %ld\n", val);
-                    fprintf(out, "move $a0, $t0\n");
-                } else {
-                    // global
-                    char* gArg = makeGlobalName(c->arg1);
-                    fprintf(out, "la $t9, %s\n", gArg);
-                    fprintf(out, "lw $t0, 0($t9)\n");
-                    fprintf(out, "move $a0, $t0\n");
-                    free(gArg);
-                }
-            }
-            // print int
+            // write arg1 => load into $t0 => move $a0, $t0 => syscall
+            loadArg(c->arg1, "$t0", out);
+            fprintf(out, "move $a0, $t0\n");
             fprintf(out, "li $v0, 1\n");
             fprintf(out, "syscall\n");
             // newline
@@ -273,18 +357,22 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             fprintf(out, "li $v0, 11\n");
             fprintf(out, "syscall\n");
         }
-
+        else if (!strcmp(op, "load")) {
+            // e.g. "t5 = load x" => t5 = x
+            loadArg(c->arg1, "$t0", out);
+            storeResult(c->result, "$t0", out);
+        }
         else {
-            // We ignore any instructions outside of { =, +, -, *, /, write } for now.
+            // unhandled or label/goto, etc.
             fprintf(out, "# Unhandled TAC: %s %s %s %s\n",
-                op,
-                c->arg1 ? c->arg1 : "",
-                c->arg2 ? c->arg2 : "",
-                c->result? c->result : "");
+                    op,
+                    c->arg1 ? c->arg1 : "",
+                    c->arg2 ? c->arg2 : "",
+                    c->result ? c->result : "");
         }
     }
 
-    // 4) End with exit
+    // 4) Exit
     fprintf(out, "\n# exit\n");
     fprintf(out, "li $v0, 10\n");
     fprintf(out, "syscall\n");

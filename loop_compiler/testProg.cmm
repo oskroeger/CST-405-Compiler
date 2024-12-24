@@ -1,8 +1,18 @@
 int x;
+int y;
 int z;
 
-x = 6;
-z = 3 * (5 + 2);
+float a;
+float b;
 
+a = 4.3 + 2.3;
+b = 8.4 * 2.1;
+
+x = 6;
+y = x + 4 * 2;
+
+
+write a;
+write b;
 write x;
-write z;
+write y;

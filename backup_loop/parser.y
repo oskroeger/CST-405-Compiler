@@ -643,7 +643,7 @@ int main() {
         // --- (2) Generate MIPS directly from the AST + symbol tables ---
         printf("\n----- GENERATING MIPS CODE -----\n");
         // Then generate MIPS from the TAC
-        generateMIPSFromTAC(tacHead, "output.s");
+        generateMIPSFromTAC(tacHead, scopeListHead, "output.s");
 
         printf("[INFO] MIPS code generated in output.s\n");
 

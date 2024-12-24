@@ -7,7 +7,7 @@
 static int tempCounter = 0;
 static char* newTemp() {
     char* buffer = (char*)malloc(20);
-    sprintf(buffer, "t_%d", tempCounter++);
+    sprintf(buffer, "t%d", tempCounter++);
     return buffer;
 }
 

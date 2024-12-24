@@ -6,6 +6,6 @@
 #include <stdio.h>
 
 // Function to generate MIPS assembly code from TAC
-void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename);
+void generateMIPSFromTAC(TAC* tacHead, ScopeNode* scopeListHead, const char* outputFilename);
 
 #endif // CODE_GENERATOR_H
