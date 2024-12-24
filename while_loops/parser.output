@@ -1,0 +1,1267 @@
+Terminals unused in grammar
+
+    RETURN
+    UNRECOGNIZED
+
+
+State 64 conflicts: 6 shift/reduce
+State 65 conflicts: 6 shift/reduce
+State 66 conflicts: 6 shift/reduce
+State 67 conflicts: 6 shift/reduce
+State 68 conflicts: 10 shift/reduce
+State 69 conflicts: 10 shift/reduce
+State 70 conflicts: 10 shift/reduce
+State 71 conflicts: 10 shift/reduce
+State 72 conflicts: 10 shift/reduce
+State 73 conflicts: 10 shift/reduce
+
+
+Grammar
+
+    0 $accept: Program $end
+
+    1 Program: FunctionDefList VarDeclList StmtList
+
+    2 FunctionDefList: ε
+    3                | FunctionDef FunctionDefList
+
+    4 FunctionDef: FunctionHeader VarDeclList StmtList FunctionFooter
+
+    5 FunctionHeader: FUNCTION ID LPAREN RPAREN LBRACE
+
+    6 FunctionFooter: RBRACE
+
+    7 VarDeclList: ε
+    8            | VarDecl VarDeclList
+
+    9 VarDecl: TYPE ID SEMICOLON
+   10        | TYPE ID LBRACKET INTEGER RBRACKET SEMICOLON
+
+   11 StmtList: ε
+   12         | Stmt StmtList
+
+   13 Stmt: ID EQ Expr SEMICOLON
+   14     | ArrayAccess EQ Expr SEMICOLON
+   15     | WRITE Expr SEMICOLON
+   16     | ID LPAREN RPAREN SEMICOLON
+   17     | WHILE LPAREN Expr RPAREN LBRACE StmtList RBRACE
+
+   18 ArrayAccess: ID LBRACKET Expr RBRACKET
+
+   19 Expr: Expr PLUS Expr
+   20     | Expr MINUS Expr
+   21     | Expr MULTIPLY Expr
+   22     | Expr DIVIDE Expr
+   23     | Expr LESS_THAN Expr
+   24     | Expr GREATER_THAN Expr
+   25     | Expr LEQ Expr
+   26     | Expr GEQ Expr
+   27     | Expr EQEQ Expr
+   28     | Expr NEQ Expr
+   29     | LPAREN Expr RPAREN
+   30     | ID
+   31     | INTEGER
+   32     | FLOAT
+   33     | ArrayAccess
+
+
+Terminals, with rules where they appear
+
+    $end (0) 0
+    error (256)
+    TYPE <string> (258) 9 10
+    ID <string> (259) 5 9 10 13 16 18 30
+    SEMICOLON <character> (260) 9 10 13 14 15 16
+    EQ <operator> (261) 13 14
+    PLUS <operator> (262) 19
+    MINUS <operator> (263) 20
+    MULTIPLY <operator> (264) 21
+    DIVIDE <operator> (265) 22
+    INTEGER <integer> (266) 10 31
+    FLOAT <floatNum> (267) 32
+    WRITE <string> (268) 15
+    WHILE <loop> (269) 17
+    LPAREN (270) 5 16 17 29
+    RPAREN (271) 5 16 17 29
+    LBRACKET (272) 10 18
+    RBRACKET (273) 10 18
+    FUNCTION (274) 5
+    RETURN (275)
+    LBRACE (276) 5 17
+    RBRACE (277) 6 17
+    UNRECOGNIZED (278)
+    LESS_THAN <comparison> (279) 23
+    GREATER_THAN <comparison> (280) 24
+    LEQ <comparison> (281) 25
+    GEQ <comparison> (282) 26
+    NEQ <comparison> (283) 28
+    EQEQ <comparison> (284) 27
+
+
+Nonterminals, with rules where they appear
+
+    $accept (30)
+        on left: 0
+    Program <ast> (31)
+        on left: 1
+        on right: 0
+    FunctionDefList <ast> (32)
+        on left: 2 3
+        on right: 1 3
+    FunctionDef <ast> (33)
+        on left: 4
+        on right: 3
+    FunctionHeader <funcHeader> (34)
+        on left: 5
+        on right: 4
+    FunctionFooter (35)
+        on left: 6
+        on right: 4
+    VarDeclList <ast> (36)
+        on left: 7 8
+        on right: 1 4 8
+    VarDecl <ast> (37)
+        on left: 9 10
+        on right: 8
+    StmtList <ast> (38)
+        on left: 11 12
+        on right: 1 4 12 17
+    Stmt <ast> (39)
+        on left: 13 14 15 16 17
+        on right: 12
+    ArrayAccess <ast> (40)
+        on left: 18
+        on right: 14 33
+    Expr <ast> (41)
+        on left: 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33
+        on right: 13 14 15 17 18 19 20 21 22 23 24 25 26 27 28 29
+
+
+State 0
+
+    0 $accept: • Program $end
+
+    FUNCTION  shift, and go to state 1
+
+    $default  reduce using rule 2 (FunctionDefList)
+
+    Program          go to state 2
+    FunctionDefList  go to state 3
+    FunctionDef      go to state 4
+    FunctionHeader   go to state 5
+
+
+State 1
+
+    5 FunctionHeader: FUNCTION • ID LPAREN RPAREN LBRACE
+
+    ID  shift, and go to state 6
+
+
+State 2
+
+    0 $accept: Program • $end
+
+    $end  shift, and go to state 7
+
+
+State 3
+
+    1 Program: FunctionDefList • VarDeclList StmtList
+
+    TYPE  shift, and go to state 8
+
+    $default  reduce using rule 7 (VarDeclList)
+
+    VarDeclList  go to state 9
+    VarDecl      go to state 10
+
+
+State 4
+
+    3 FunctionDefList: FunctionDef • FunctionDefList
+
+    FUNCTION  shift, and go to state 1
+
+    $default  reduce using rule 2 (FunctionDefList)
+
+    FunctionDefList  go to state 11
+    FunctionDef      go to state 4
+    FunctionHeader   go to state 5
+
+
+State 5
+
+    4 FunctionDef: FunctionHeader • VarDeclList StmtList FunctionFooter
+
+    TYPE  shift, and go to state 8
+
+    $default  reduce using rule 7 (VarDeclList)
+
+    VarDeclList  go to state 12
+    VarDecl      go to state 10
+
+
+State 6
+
+    5 FunctionHeader: FUNCTION ID • LPAREN RPAREN LBRACE
+
+    LPAREN  shift, and go to state 13
+
+
+State 7
+
+    0 $accept: Program $end •
+
+    $default  accept
+
+
+State 8
+
+    9 VarDecl: TYPE • ID SEMICOLON
+   10        | TYPE • ID LBRACKET INTEGER RBRACKET SEMICOLON
+
+    ID  shift, and go to state 14
+
+
+State 9
+
+    1 Program: FunctionDefList VarDeclList • StmtList
+
+    ID     shift, and go to state 15
+    WRITE  shift, and go to state 16
+    WHILE  shift, and go to state 17
+
+    $default  reduce using rule 11 (StmtList)
+
+    StmtList     go to state 18
+    Stmt         go to state 19
+    ArrayAccess  go to state 20
+
+
+State 10
+
+    8 VarDeclList: VarDecl • VarDeclList
+
+    TYPE  shift, and go to state 8
+
+    $default  reduce using rule 7 (VarDeclList)
+
+    VarDeclList  go to state 21
+    VarDecl      go to state 10
+
+
+State 11
+
+    3 FunctionDefList: FunctionDef FunctionDefList •
+
+    $default  reduce using rule 3 (FunctionDefList)
+
+
+State 12
+
+    4 FunctionDef: FunctionHeader VarDeclList • StmtList FunctionFooter
+
+    ID     shift, and go to state 15
+    WRITE  shift, and go to state 16
+    WHILE  shift, and go to state 17
+
+    $default  reduce using rule 11 (StmtList)
+
+    StmtList     go to state 22
+    Stmt         go to state 19
+    ArrayAccess  go to state 20
+
+
+State 13
+
+    5 FunctionHeader: FUNCTION ID LPAREN • RPAREN LBRACE
+
+    RPAREN  shift, and go to state 23
+
+
+State 14
+
+    9 VarDecl: TYPE ID • SEMICOLON
+   10        | TYPE ID • LBRACKET INTEGER RBRACKET SEMICOLON
+
+    SEMICOLON  shift, and go to state 24
+    LBRACKET   shift, and go to state 25
+
+
+State 15
+
+   13 Stmt: ID • EQ Expr SEMICOLON
+   16     | ID • LPAREN RPAREN SEMICOLON
+   18 ArrayAccess: ID • LBRACKET Expr RBRACKET
+
+    EQ        shift, and go to state 26
+    LPAREN    shift, and go to state 27
+    LBRACKET  shift, and go to state 28
+
+
+State 16
+
+   15 Stmt: WRITE • Expr SEMICOLON
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 34
+
+
+State 17
+
+   17 Stmt: WHILE • LPAREN Expr RPAREN LBRACE StmtList RBRACE
+
+    LPAREN  shift, and go to state 35
+
+
+State 18
+
+    1 Program: FunctionDefList VarDeclList StmtList •
+
+    $default  reduce using rule 1 (Program)
+
+
+State 19
+
+   12 StmtList: Stmt • StmtList
+
+    ID     shift, and go to state 15
+    WRITE  shift, and go to state 16
+    WHILE  shift, and go to state 17
+
+    $default  reduce using rule 11 (StmtList)
+
+    StmtList     go to state 36
+    Stmt         go to state 19
+    ArrayAccess  go to state 20
+
+
+State 20
+
+   14 Stmt: ArrayAccess • EQ Expr SEMICOLON
+
+    EQ  shift, and go to state 37
+
+
+State 21
+
+    8 VarDeclList: VarDecl VarDeclList •
+
+    $default  reduce using rule 8 (VarDeclList)
+
+
+State 22
+
+    4 FunctionDef: FunctionHeader VarDeclList StmtList • FunctionFooter
+
+    RBRACE  shift, and go to state 38
+
+    FunctionFooter  go to state 39
+
+
+State 23
+
+    5 FunctionHeader: FUNCTION ID LPAREN RPAREN • LBRACE
+
+    LBRACE  shift, and go to state 40
+
+
+State 24
+
+    9 VarDecl: TYPE ID SEMICOLON •
+
+    $default  reduce using rule 9 (VarDecl)
+
+
+State 25
+
+   10 VarDecl: TYPE ID LBRACKET • INTEGER RBRACKET SEMICOLON
+
+    INTEGER  shift, and go to state 41
+
+
+State 26
+
+   13 Stmt: ID EQ • Expr SEMICOLON
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 42
+
+
+State 27
+
+   16 Stmt: ID LPAREN • RPAREN SEMICOLON
+
+    RPAREN  shift, and go to state 43
+
+
+State 28
+
+   18 ArrayAccess: ID LBRACKET • Expr RBRACKET
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 44
+
+
+State 29
+
+   18 ArrayAccess: ID • LBRACKET Expr RBRACKET
+   30 Expr: ID •
+
+    LBRACKET  shift, and go to state 28
+
+    $default  reduce using rule 30 (Expr)
+
+
+State 30
+
+   31 Expr: INTEGER •
+
+    $default  reduce using rule 31 (Expr)
+
+
+State 31
+
+   32 Expr: FLOAT •
+
+    $default  reduce using rule 32 (Expr)
+
+
+State 32
+
+   29 Expr: LPAREN • Expr RPAREN
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 45
+
+
+State 33
+
+   33 Expr: ArrayAccess •
+
+    $default  reduce using rule 33 (Expr)
+
+
+State 34
+
+   15 Stmt: WRITE Expr • SEMICOLON
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    SEMICOLON     shift, and go to state 46
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+
+State 35
+
+   17 Stmt: WHILE LPAREN • Expr RPAREN LBRACE StmtList RBRACE
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 57
+
+
+State 36
+
+   12 StmtList: Stmt StmtList •
+
+    $default  reduce using rule 12 (StmtList)
+
+
+State 37
+
+   14 Stmt: ArrayAccess EQ • Expr SEMICOLON
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 58
+
+
+State 38
+
+    6 FunctionFooter: RBRACE •
+
+    $default  reduce using rule 6 (FunctionFooter)
+
+
+State 39
+
+    4 FunctionDef: FunctionHeader VarDeclList StmtList FunctionFooter •
+
+    $default  reduce using rule 4 (FunctionDef)
+
+
+State 40
+
+    5 FunctionHeader: FUNCTION ID LPAREN RPAREN LBRACE •
+
+    $default  reduce using rule 5 (FunctionHeader)
+
+
+State 41
+
+   10 VarDecl: TYPE ID LBRACKET INTEGER • RBRACKET SEMICOLON
+
+    RBRACKET  shift, and go to state 59
+
+
+State 42
+
+   13 Stmt: ID EQ Expr • SEMICOLON
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    SEMICOLON     shift, and go to state 60
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+
+State 43
+
+   16 Stmt: ID LPAREN RPAREN • SEMICOLON
+
+    SEMICOLON  shift, and go to state 61
+
+
+State 44
+
+   18 ArrayAccess: ID LBRACKET Expr • RBRACKET
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    RBRACKET      shift, and go to state 62
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+
+State 45
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+   29     | LPAREN Expr • RPAREN
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    RPAREN        shift, and go to state 63
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+
+State 46
+
+   15 Stmt: WRITE Expr SEMICOLON •
+
+    $default  reduce using rule 15 (Stmt)
+
+
+State 47
+
+   19 Expr: Expr PLUS • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 64
+
+
+State 48
+
+   20 Expr: Expr MINUS • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 65
+
+
+State 49
+
+   21 Expr: Expr MULTIPLY • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 66
+
+
+State 50
+
+   22 Expr: Expr DIVIDE • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 67
+
+
+State 51
+
+   23 Expr: Expr LESS_THAN • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 68
+
+
+State 52
+
+   24 Expr: Expr GREATER_THAN • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 69
+
+
+State 53
+
+   25 Expr: Expr LEQ • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 70
+
+
+State 54
+
+   26 Expr: Expr GEQ • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 71
+
+
+State 55
+
+   28 Expr: Expr NEQ • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 72
+
+
+State 56
+
+   27 Expr: Expr EQEQ • Expr
+
+    ID       shift, and go to state 29
+    INTEGER  shift, and go to state 30
+    FLOAT    shift, and go to state 31
+    LPAREN   shift, and go to state 32
+
+    ArrayAccess  go to state 33
+    Expr         go to state 73
+
+
+State 57
+
+   17 Stmt: WHILE LPAREN Expr • RPAREN LBRACE StmtList RBRACE
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    RPAREN        shift, and go to state 74
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+
+State 58
+
+   14 Stmt: ArrayAccess EQ Expr • SEMICOLON
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    SEMICOLON     shift, and go to state 75
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+
+State 59
+
+   10 VarDecl: TYPE ID LBRACKET INTEGER RBRACKET • SEMICOLON
+
+    SEMICOLON  shift, and go to state 76
+
+
+State 60
+
+   13 Stmt: ID EQ Expr SEMICOLON •
+
+    $default  reduce using rule 13 (Stmt)
+
+
+State 61
+
+   16 Stmt: ID LPAREN RPAREN SEMICOLON •
+
+    $default  reduce using rule 16 (Stmt)
+
+
+State 62
+
+   18 ArrayAccess: ID LBRACKET Expr RBRACKET •
+
+    $default  reduce using rule 18 (ArrayAccess)
+
+
+State 63
+
+   29 Expr: LPAREN Expr RPAREN •
+
+    $default  reduce using rule 29 (Expr)
+
+
+State 64
+
+   19 Expr: Expr • PLUS Expr
+   19     | Expr PLUS Expr •
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    LESS_THAN     [reduce using rule 19 (Expr)]
+    GREATER_THAN  [reduce using rule 19 (Expr)]
+    LEQ           [reduce using rule 19 (Expr)]
+    GEQ           [reduce using rule 19 (Expr)]
+    NEQ           [reduce using rule 19 (Expr)]
+    EQEQ          [reduce using rule 19 (Expr)]
+    $default      reduce using rule 19 (Expr)
+
+
+State 65
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   20     | Expr MINUS Expr •
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    LESS_THAN     [reduce using rule 20 (Expr)]
+    GREATER_THAN  [reduce using rule 20 (Expr)]
+    LEQ           [reduce using rule 20 (Expr)]
+    GEQ           [reduce using rule 20 (Expr)]
+    NEQ           [reduce using rule 20 (Expr)]
+    EQEQ          [reduce using rule 20 (Expr)]
+    $default      reduce using rule 20 (Expr)
+
+
+State 66
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   21     | Expr MULTIPLY Expr •
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    LESS_THAN     [reduce using rule 21 (Expr)]
+    GREATER_THAN  [reduce using rule 21 (Expr)]
+    LEQ           [reduce using rule 21 (Expr)]
+    GEQ           [reduce using rule 21 (Expr)]
+    NEQ           [reduce using rule 21 (Expr)]
+    EQEQ          [reduce using rule 21 (Expr)]
+    $default      reduce using rule 21 (Expr)
+
+
+State 67
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   22     | Expr DIVIDE Expr •
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    LESS_THAN     [reduce using rule 22 (Expr)]
+    GREATER_THAN  [reduce using rule 22 (Expr)]
+    LEQ           [reduce using rule 22 (Expr)]
+    GEQ           [reduce using rule 22 (Expr)]
+    NEQ           [reduce using rule 22 (Expr)]
+    EQEQ          [reduce using rule 22 (Expr)]
+    $default      reduce using rule 22 (Expr)
+
+
+State 68
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   23     | Expr LESS_THAN Expr •
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    PLUS          [reduce using rule 23 (Expr)]
+    MINUS         [reduce using rule 23 (Expr)]
+    MULTIPLY      [reduce using rule 23 (Expr)]
+    DIVIDE        [reduce using rule 23 (Expr)]
+    LESS_THAN     [reduce using rule 23 (Expr)]
+    GREATER_THAN  [reduce using rule 23 (Expr)]
+    LEQ           [reduce using rule 23 (Expr)]
+    GEQ           [reduce using rule 23 (Expr)]
+    NEQ           [reduce using rule 23 (Expr)]
+    EQEQ          [reduce using rule 23 (Expr)]
+    $default      reduce using rule 23 (Expr)
+
+
+State 69
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   24     | Expr GREATER_THAN Expr •
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    PLUS          [reduce using rule 24 (Expr)]
+    MINUS         [reduce using rule 24 (Expr)]
+    MULTIPLY      [reduce using rule 24 (Expr)]
+    DIVIDE        [reduce using rule 24 (Expr)]
+    LESS_THAN     [reduce using rule 24 (Expr)]
+    GREATER_THAN  [reduce using rule 24 (Expr)]
+    LEQ           [reduce using rule 24 (Expr)]
+    GEQ           [reduce using rule 24 (Expr)]
+    NEQ           [reduce using rule 24 (Expr)]
+    EQEQ          [reduce using rule 24 (Expr)]
+    $default      reduce using rule 24 (Expr)
+
+
+State 70
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   25     | Expr LEQ Expr •
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    PLUS          [reduce using rule 25 (Expr)]
+    MINUS         [reduce using rule 25 (Expr)]
+    MULTIPLY      [reduce using rule 25 (Expr)]
+    DIVIDE        [reduce using rule 25 (Expr)]
+    LESS_THAN     [reduce using rule 25 (Expr)]
+    GREATER_THAN  [reduce using rule 25 (Expr)]
+    LEQ           [reduce using rule 25 (Expr)]
+    GEQ           [reduce using rule 25 (Expr)]
+    NEQ           [reduce using rule 25 (Expr)]
+    EQEQ          [reduce using rule 25 (Expr)]
+    $default      reduce using rule 25 (Expr)
+
+
+State 71
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   26     | Expr GEQ Expr •
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    PLUS          [reduce using rule 26 (Expr)]
+    MINUS         [reduce using rule 26 (Expr)]
+    MULTIPLY      [reduce using rule 26 (Expr)]
+    DIVIDE        [reduce using rule 26 (Expr)]
+    LESS_THAN     [reduce using rule 26 (Expr)]
+    GREATER_THAN  [reduce using rule 26 (Expr)]
+    LEQ           [reduce using rule 26 (Expr)]
+    GEQ           [reduce using rule 26 (Expr)]
+    NEQ           [reduce using rule 26 (Expr)]
+    EQEQ          [reduce using rule 26 (Expr)]
+    $default      reduce using rule 26 (Expr)
+
+
+State 72
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   28     | Expr • NEQ Expr
+   28     | Expr NEQ Expr •
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    PLUS          [reduce using rule 28 (Expr)]
+    MINUS         [reduce using rule 28 (Expr)]
+    MULTIPLY      [reduce using rule 28 (Expr)]
+    DIVIDE        [reduce using rule 28 (Expr)]
+    LESS_THAN     [reduce using rule 28 (Expr)]
+    GREATER_THAN  [reduce using rule 28 (Expr)]
+    LEQ           [reduce using rule 28 (Expr)]
+    GEQ           [reduce using rule 28 (Expr)]
+    NEQ           [reduce using rule 28 (Expr)]
+    EQEQ          [reduce using rule 28 (Expr)]
+    $default      reduce using rule 28 (Expr)
+
+
+State 73
+
+   19 Expr: Expr • PLUS Expr
+   20     | Expr • MINUS Expr
+   21     | Expr • MULTIPLY Expr
+   22     | Expr • DIVIDE Expr
+   23     | Expr • LESS_THAN Expr
+   24     | Expr • GREATER_THAN Expr
+   25     | Expr • LEQ Expr
+   26     | Expr • GEQ Expr
+   27     | Expr • EQEQ Expr
+   27     | Expr EQEQ Expr •
+   28     | Expr • NEQ Expr
+
+    PLUS          shift, and go to state 47
+    MINUS         shift, and go to state 48
+    MULTIPLY      shift, and go to state 49
+    DIVIDE        shift, and go to state 50
+    LESS_THAN     shift, and go to state 51
+    GREATER_THAN  shift, and go to state 52
+    LEQ           shift, and go to state 53
+    GEQ           shift, and go to state 54
+    NEQ           shift, and go to state 55
+    EQEQ          shift, and go to state 56
+
+    PLUS          [reduce using rule 27 (Expr)]
+    MINUS         [reduce using rule 27 (Expr)]
+    MULTIPLY      [reduce using rule 27 (Expr)]
+    DIVIDE        [reduce using rule 27 (Expr)]
+    LESS_THAN     [reduce using rule 27 (Expr)]
+    GREATER_THAN  [reduce using rule 27 (Expr)]
+    LEQ           [reduce using rule 27 (Expr)]
+    GEQ           [reduce using rule 27 (Expr)]
+    NEQ           [reduce using rule 27 (Expr)]
+    EQEQ          [reduce using rule 27 (Expr)]
+    $default      reduce using rule 27 (Expr)
+
+
+State 74
+
+   17 Stmt: WHILE LPAREN Expr RPAREN • LBRACE StmtList RBRACE
+
+    LBRACE  shift, and go to state 77
+
+
+State 75
+
+   14 Stmt: ArrayAccess EQ Expr SEMICOLON •
+
+    $default  reduce using rule 14 (Stmt)
+
+
+State 76
+
+   10 VarDecl: TYPE ID LBRACKET INTEGER RBRACKET SEMICOLON •
+
+    $default  reduce using rule 10 (VarDecl)
+
+
+State 77
+
+   17 Stmt: WHILE LPAREN Expr RPAREN LBRACE • StmtList RBRACE
+
+    ID     shift, and go to state 15
+    WRITE  shift, and go to state 16
+    WHILE  shift, and go to state 17
+
+    $default  reduce using rule 11 (StmtList)
+
+    StmtList     go to state 78
+    Stmt         go to state 19
+    ArrayAccess  go to state 20
+
+
+State 78
+
+   17 Stmt: WHILE LPAREN Expr RPAREN LBRACE StmtList • RBRACE
+
+    RBRACE  shift, and go to state 79
+
+
+State 79
+
+   17 Stmt: WHILE LPAREN Expr RPAREN LBRACE StmtList RBRACE •
+
+    $default  reduce using rule 17 (Stmt)
