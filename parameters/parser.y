@@ -632,7 +632,12 @@ int main() {
         TAC* tacHead = generateTAC(root, NULL);
         printTAC(tacHead);
 
-        // generateMIPS(tacHead, "output.s");
+        // --- (2) Generate MIPS directly from the AST + symbol tables ---
+        printf("\n----- GENERATING MIPS CODE -----\n");
+        // Then generate MIPS from the TAC
+        generateMIPSFromTAC(tacHead, scopeListHead, "output.s");
+
+        printf("[INFO] MIPS code generated in output.s\n");
 
         // Cleanup TAC
         freeTAC(tacHead);
