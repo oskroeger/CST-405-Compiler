@@ -1,13 +1,25 @@
 int x;
 int y;
 int z;
+
+int a;
+int b;
+
 int arr[5];
+int arr2[5];
 
 x = 6;
 y = x + 4 * 2;
-arr[0] = 3 + 7;
+arr[0] = 8 * (3 + 7);
+arr[1] = 5 + x;
 z = arr[0];
+
+arr2[0] = 4;
+a = arr2[0];
+b = arr[1];
 
 write x;
 write y;
 write z;
+write a;
+write b;
