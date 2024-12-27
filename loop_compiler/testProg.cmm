@@ -1,12 +1,12 @@
 int x;
 int y;
 int z;
-int a;
+int arr[5];
 
 x = 6;
 y = x + 4 * 2;
-a = 3 + 7;
-z = a;
+arr[0] = 3 + 7;
+z = arr[0];
 
 write x;
 write y;

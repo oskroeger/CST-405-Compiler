@@ -44,7 +44,6 @@ move $s1, $t8
 add $t9, $s0, $s1
 move $t9, $t9
 la $s7, var_arr
-lw $s7, 0($s7)
 move $s0, $t6
 sll $t0, $s0, 2
 add $t0, $s7, $t0
@@ -54,7 +53,6 @@ li $s0, 0
 la $s6, var_t_11
 sw $s0, 0($s6)
 la $s7, var_arr
-lw $s7, 0($s7)
 la $s6, var_t_11
 lw $s0, 0($s6)
 sll $t0, $s0, 2

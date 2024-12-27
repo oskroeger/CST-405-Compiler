@@ -334,9 +334,8 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     if (isArrayKnown(arg)) {
         // Use $s7 for arrays
         fprintf(out, "la $s7, var_%s\n", arg);
-        fprintf(out, "lw %s, 0($s7)\n", scratch);
-        fprintf(stderr, "DEBUG: Loaded array %s into %s from var_%s\n", arg, scratch, arg);
-        return scratch;
+        fprintf(stderr, "DEBUG: Loaded array %s base address into $s7 from var_%s\n", arg, arg);
+        return "$s7"; // Return $s7 as the scratch register for array base
     } else {
         // Use $s6 for scalar variables
         char* g = makeGlobalName(arg);
@@ -353,6 +352,7 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     fprintf(stderr, "[ERROR] Unable to load argument: %s\n", arg);
     return "$zero";
 }
+
 
 static void storeResult(const char* dest, const char* srcReg, FILE* out) {
     if (!dest) return;
@@ -377,9 +377,8 @@ static void storeResult(const char* dest, const char* srcReg, FILE* out) {
 
     if (isArrayKnown(dest)) {
         // Use $s7 for arrays
-        fprintf(out, "la $s7, var_%s\n", dest);
         fprintf(out, "sw %s, 0($s7)\n", srcReg);
-        fprintf(stderr, "DEBUG: Stored %s into array %s from var_%s\n", srcReg, dest, dest);
+        fprintf(stderr, "DEBUG: Stored %s into array %s from $s7\n", srcReg, dest);
     } else {
         // Use $s6 for scalar variables
         char* g = makeGlobalName(dest);
@@ -391,6 +390,7 @@ static void storeResult(const char* dest, const char* srcReg, FILE* out) {
         }
     }
 }
+
 
 // --------------------------------------------------------------------------
 // 5) Main code generator
@@ -508,7 +508,7 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             loadArg(c->arg1, "$s1", out);
 
             // 6. Store word into address: sw $s1, 0($t0)
-            fprintf(out, "sw %s, 0($t0)\n", "$s1");
+            fprintf(out, "sw $s1, 0($t0)\n");
         }
         else {
             // Handle other operators or unhandled TAC
@@ -580,6 +580,7 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
     // 5) Exit the program
     fprintf(out, "li $v0, 10\n");
     fprintf(out, "syscall\n");
-
+    
     fclose(out);
 }
+
