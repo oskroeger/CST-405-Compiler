@@ -1,8 +1,13 @@
 int x;
 int y;
+int z;
+int a;
 
 x = 6;
 y = x + 4 * 2;
+a = 3 + 7;
+z = a;
 
 write x;
 write y;
+write z;
