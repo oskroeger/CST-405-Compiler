@@ -9,6 +9,7 @@
 
 #define MAX_REGS 10  // Number of MIPS registers we'll use for temps ($t0..$t9)
 #define MAX_TEMPS 200
+#define MAX_LABELS 1000
 
 typedef struct {
     char* tempName;          // e.g., "t_6"
@@ -35,6 +36,9 @@ typedef struct {
 
 static ArrayInfo g_arrays[100];
 static int g_numArrays = 0;
+
+// Label counter for unique label generation
+static int labelCounter = 0;
 
 // Helper to see if a name is already in g_globalNames
 static int isGlobalKnown(const char* name) {
@@ -255,9 +259,12 @@ static void collectGlobalVars(TAC* tac, FILE* out) {
                 if (g) { addGlobalName(g); free(g); }
             }
         }
-        // For +, -, *, / => check if arg1/arg2/result are user variables
+        // For +, -, *, /, ==, !=, <, <=, >, >= => check if arg1/arg2/result are user variables
         if (!strcmp(op, "+") || !strcmp(op, "-") ||
-            !strcmp(op, "*") || !strcmp(op, "/")) {
+            !strcmp(op, "*") || !strcmp(op, "/") ||
+            !strcmp(op, "==") || !strcmp(op, "!=") ||
+            !strcmp(op, "<") || !strcmp(op, "<=") ||
+            !strcmp(op, ">") || !strcmp(op, ">=")) {
             if (c->arg1 && !isTempName(c->arg1)) {
                 char* g = makeGlobalName(c->arg1);
                 if (g) { addGlobalName(g); free(g); }
@@ -300,7 +307,7 @@ static void collectGlobalVars(TAC* tac, FILE* out) {
 
 static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     if (!arg) return scratch;
-    
+
     // 1) Check if the argument is an integer literal
     char* endp;
     long val = strtol(arg, &endp, 10);
@@ -353,7 +360,6 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     return "$zero";
 }
 
-
 static void storeResult(const char* dest, const char* srcReg, FILE* out) {
     if (!dest) return;
 
@@ -391,13 +397,12 @@ static void storeResult(const char* dest, const char* srcReg, FILE* out) {
     }
 }
 
-
 // --------------------------------------------------------------------------
 // 5) Main code generator
 // --------------------------------------------------------------------------
 
 void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
-    fprintf(stderr, "DEBUG: Using the FIXED code generator with array support!\n");
+    fprintf(stderr, "DEBUG: Using the FIXED code generator with array and if-statement support!\n");
     FILE* out = fopen(outputFilename, "w");
     if (!out) {
         fprintf(stderr, "[ERROR] Could not open %s\n", outputFilename);
@@ -431,26 +436,95 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             storeResult(c->result, "$s0", out);      // Store from $s0 to result
         }
         else if (!strcmp(op, "+") || !strcmp(op, "-") ||
-                 !strcmp(op, "*") || !strcmp(op, "/")) 
+                 !strcmp(op, "*") || !strcmp(op, "/") ||
+                 !strcmp(op, "==") || !strcmp(op, "!=") ||
+                 !strcmp(op, "<") || !strcmp(op, "<=") ||
+                 !strcmp(op, ">") || !strcmp(op, ">="))
         {
             // result = arg1 op arg2
             loadArg(c->arg1, "$s0", out);             // Load arg1 into $s0
             loadArg(c->arg2, "$s1", out);             // Load arg2 into $s1
 
-            // Perform the operation using $t9 as a temporary
-            if (!strcmp(op, "+")) {
-                fprintf(out, "add $t9, $s0, $s1\n");
-            } else if (!strcmp(op, "-")) {
-                fprintf(out, "sub $t9, $s0, $s1\n");
-            } else if (!strcmp(op, "*")) {
-                fprintf(out, "mul $t9, $s0, $s1\n");
-            } else if (!strcmp(op, "/")) {
-                fprintf(out, "div $s0, $s1\n");
-                fprintf(out, "mflo $t9\n");
-            }
+            if (!strcmp(op, "==")) {
+                // Handle equality
+                // Compare $s0 and $s1, set $t9 to 1 if equal, else 0
+                // Generate unique labels
+                char label_true[64];
+                char label_end[64];
+                sprintf(label_true, "L_eq_true_%d", labelCounter++);
+                sprintf(label_end, "L_eq_end_%d", labelCounter++);
 
-            // Store the result
-            storeResult(c->result, "$t9", out);
+                fprintf(out, "beq %s, %s, %s\n", "$s0", "$s1", label_true);
+                fprintf(out, "li $t9, 0\n");
+                fprintf(out, "j %s\n", label_end);
+                fprintf(out, "%s:\n", label_true);
+                fprintf(out, "li $t9, 1\n");
+                fprintf(out, "%s:\n", label_end);
+
+                // Store the result
+                storeResult(c->result, "$t9", out);
+            }
+            else if (!strcmp(op, "!=")) {
+                // Handle inequality
+                char label_true[64];
+                char label_end[64];
+                sprintf(label_true, "L_neq_true_%d", labelCounter++);
+                sprintf(label_end, "L_neq_end_%d", labelCounter++);
+
+                fprintf(out, "bne %s, %s, %s\n", "$s0", "$s1", label_true);
+                fprintf(out, "li $t9, 0\n");
+                fprintf(out, "j %s\n", label_end);
+                fprintf(out, "%s:\n", label_true);
+                fprintf(out, "li $t9, 1\n");
+                fprintf(out, "%s:\n", label_end);
+
+                storeResult(c->result, "$t9", out);
+            }
+            else if (!strcmp(op, "<")) {
+                // Handle less than
+                // Use 'slt $t9, $s0, $s1' sets $t9 to 1 if $s0 < $s1
+                fprintf(out, "slt $t9, %s, %s\n", "$s0", "$s1\n");
+                storeResult(c->result, "$t9", out);
+            }
+            else if (!strcmp(op, "<=")) {
+                // Handle less than or equal
+                // slt $t9, $s1, $s0 -> $t9 = 1 if $s1 < $s0
+                // xori $t9, $t9, 1 -> $t9 = 0 if $s1 < $s0 else 1
+                fprintf(out, "slt $t9, %s, %s\n", "$s1", "$s0");
+                fprintf(out, "xori $t9, $t9, 1\n");
+                storeResult(c->result, "$t9", out);
+            }
+            else if (!strcmp(op, ">")) {
+                // Handle greater than
+                // slt $t9, $s1, $s0
+                fprintf(out, "slt $t9, %s, %s\n", "$s1", "$s0");
+                storeResult(c->result, "$t9", out);
+            }
+            else if (!strcmp(op, ">=")) {
+                // Handle greater than or equal
+                // slt $t9, $s0, $s1 -> $t9 = 1 if $s0 < $s1
+                // xori $t9, $t9, 1 -> $t9 = 0 if $s0 < $s1 else 1
+                fprintf(out, "slt $t9, %s, %s\n", "$s0", "$s1");
+                fprintf(out, "xori $t9, $t9, 1\n");
+                storeResult(c->result, "$t9", out);
+            }
+            else {
+                // Handle arithmetic operators: +, -, *, /
+                // Perform the operation using $t9 as a temporary
+                if (!strcmp(op, "+")) {
+                    fprintf(out, "add $t9, $s0, $s1\n");
+                } else if (!strcmp(op, "-")) {
+                    fprintf(out, "sub $t9, $s0, $s1\n");
+                } else if (!strcmp(op, "*")) {
+                    fprintf(out, "mul $t9, $s0, $s1\n");
+                } else if (!strcmp(op, "/")) {
+                    fprintf(out, "div %s, %s\n", "$s0", "$s1");
+                    fprintf(out, "mflo $t9\n");
+                }
+
+                // Store the result
+                storeResult(c->result, "$t9", out);
+            }
         }
         else if (!strcmp(op, "write")) {
             // write arg1 => load into $a0 => syscall
@@ -580,7 +654,6 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
     // 5) Exit the program
     fprintf(out, "li $v0, 10\n");
     fprintf(out, "syscall\n");
-    
+
     fclose(out);
 }
-
