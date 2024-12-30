@@ -1,14 +1,25 @@
 int x;
 int y;
+int z;
+int arr[5];
 
 x = 3;
+arr[0] = 8 * (3 + 4);
 
-if (x == 4) {
+while (x <= 6) {
+    x = x + 1;
+}
+
+if (x > 4) {
     y = 5;
+    x = x + 6;
 }
 else {
-    y = 7;
+    y = 4;
 }
+
+z = arr[0] - 2;
 
 write x;
 write y;
+write z;

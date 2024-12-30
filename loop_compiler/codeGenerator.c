@@ -37,7 +37,7 @@ typedef struct {
 static ArrayInfo g_arrays[100];
 static int g_numArrays = 0;
 
-// Label counter for unique label generation
+// Separate label counter for unique label generation
 static int labelCounter = 0;
 
 // Helper to see if a name is already in g_globalNames
@@ -402,7 +402,7 @@ static void storeResult(const char* dest, const char* srcReg, FILE* out) {
 // --------------------------------------------------------------------------
 
 void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
-    fprintf(stderr, "DEBUG: Using the FIXED code generator with array and if-statement support!\n");
+    fprintf(stderr, "DEBUG: Using the FIXED code generator with array and while-loop support!\n");
     FILE* out = fopen(outputFilename, "w");
     if (!out) {
         fprintf(stderr, "[ERROR] Could not open %s\n", outputFilename);
@@ -414,6 +414,7 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
     g_nextRegIndex = 0;
     g_numGlobals = 0;
     g_numArrays = 0;
+    labelCounter = 0; // Initialize label counter
 
     // 1) Collect global vars + do register assignment/spilling
     collectGlobalVars(tacHead, out);
