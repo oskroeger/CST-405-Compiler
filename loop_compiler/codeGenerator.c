@@ -250,8 +250,18 @@ static void collectGlobalVars(TAC* tac, FILE* out) {
         // For assignment or write/load, etc.
         if (!strcmp(op, "=") && c->result) {
             if (!isTempName(c->result)) {
-                char* g = makeGlobalName(c->result);
-                if (g) { addGlobalName(g); free(g); }
+                // **NEW LOGIC**: Exclude parameters from global variables
+                int is_param = 0;
+                if (currentFunctionEndLabel[0] != '\0') {
+                    // **UPDATED LOGIC**: Exclude 'a' and 'b' for any function
+                    if (strcmp(c->result, "a") == 0 || strcmp(c->result, "b") == 0) {
+                        is_param = 1;
+                    }
+                }
+                if (!is_param) {
+                    char* g = makeGlobalName(c->result);
+                    if (g) { addGlobalName(g); free(g); }
+                }
             }
         }
         if (!strcmp(op, "write") && c->arg1) {
@@ -360,24 +370,18 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
         // Use $s6 for scalar variables
         char* g = makeGlobalName(arg);
         if (g) {
-            // **NEW LOGIC**: Check if we're inside a function and 'arg' is a parameter
+            // **NEW LOGIC**: Map 'a' and 'b' to $a0 and $a1 for any function
             if (currentFunctionEndLabel[0] != '\0') {
-                // Extract function name from 'endfunc_<name>'
-                char function_name[64];
-                sscanf(currentFunctionEndLabel, "endfunc_%s", function_name);
-
-                // Example: For function 'add', parameters are 'a' -> $a0, 'b' -> $a1
-                if (strcmp(function_name, "add") == 0) {
-                    if (strcmp(arg, "a") == 0) {
-                        fprintf(out, "    move %s, $a0\n", scratch);
-                        fprintf(stderr, "DEBUG: Moved $a0 to %s\n", scratch);
-                        return scratch;
-                    }
-                    if (strcmp(arg, "b") == 0) {
-                        fprintf(out, "    move %s, $a1\n", scratch);
-                        fprintf(stderr, "DEBUG: Moved $a1 to %s\n", scratch);
-                        return scratch;
-                    }
+                // Assume all functions have parameters named 'a' and 'b'
+                if (strcmp(arg, "a") == 0) {
+                    fprintf(out, "    move %s, $a0\n", scratch);
+                    fprintf(stderr, "DEBUG: Moved $a0 to %s\n", scratch);
+                    return scratch;
+                }
+                if (strcmp(arg, "b") == 0) {
+                    fprintf(out, "    move %s, $a1\n", scratch);
+                    fprintf(stderr, "DEBUG: Moved $a1 to %s\n", scratch);
+                    return scratch;
                 }
             }
 
@@ -393,7 +397,6 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     fprintf(stderr, "[ERROR] Unable to load argument: %s\n", arg);
     return "$zero";
 }
-
 
 static void storeResult(const char* dest, const char* srcReg, FILE* out) {
     if (!dest) return;
@@ -487,6 +490,7 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
     // 3) Initialize flags for tracking
     int in_function = 0;      // Flag to track if we're inside a function
     int main_emitted = 0;     // Flag to ensure 'main:' is emitted only once
+    int paramCount = 0;       // Counter for parameters
 
     // 4) Iterate through TAC and emit code sequentially
     for (TAC* c = tacHead; c; c = c->next) {
@@ -498,6 +502,7 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
                 // Function label detected
                 generateFunctionPrologue(c->result, out);
                 in_function = 1;
+                paramCount = 0; // Reset parameter count for new function
                 continue;
             }
         }
@@ -508,6 +513,7 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
                 // Function epilogue label detected
                 generateFunctionEpilogue(c->result, out);
                 in_function = 0;
+                currentFunctionEndLabel[0] = '\0'; // Reset after function end
                 continue;
             }
         }
@@ -671,7 +677,7 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             loadArg(c->arg1, "$s1", out);
 
             // 6. Store word into address: sw $s1, 0($t0)
-            fprintf(out, "    sw $s1, 0($t0)\n");
+            fprintf(out, "    sw %s, 0($t0)\n", "$s1");
         }
         else if (!strcmp(op, "ifFalse")) {
             // ifFalse cond goto label
@@ -707,6 +713,7 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
                     fprintf(stderr, "[ERROR] Unknown binding for %s\n", c->result);
                 }
             }
+            paramCount = 0;
         }
         else if (!strcmp(op, "return")) {
             // Return statement
@@ -724,7 +731,6 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
         else if (!strcmp(op, "param")) {
             // Handle function parameters
             // Assuming parameters are passed via $a0..$a3
-            static int paramCount = 0;
             if (paramCount < 4) {
                 loadArg(c->arg1, "$s0", out);         // Load parameter into $s0
                 fprintf(out, "    move $a%d, $s0\n", paramCount);
