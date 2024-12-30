@@ -10,6 +10,7 @@ int x;
 int y;
 int z;
 int d;
+int e;
 
 int arr[5];
 
@@ -30,8 +31,12 @@ while (d <= 2) {
 }
 
 arr[0] = d;
+arr[1] = 4 * (9 + 2);
+
+e = arr[1];
 
 write x;
 write y;
 write z;
 write d;
+write e;

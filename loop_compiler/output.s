@@ -15,12 +15,21 @@ var_t_25: .word 0
 var_t_23: .word 0
 var_t_26: .word 0
 var_t_27: .word 0
+var_t_28: .word 0
+var_t_30: .word 0
+var_t_32: .word 0
+var_t_33: .word 0
+var_t_31: .word 0
+var_t_29: .word 0
+var_t_35: .word 0
+var_t_34: .word 0
 var_a: .word 0
 var_b: .word 0
 var_x: .word 0
 var_y: .word 0
 var_z: .word 0
 var_d: .word 0
+var_e: .word 0
 var_arr: .word 0, 0, 0, 0, 0
 
 .text
@@ -150,6 +159,38 @@ L_while_end_19:
     add $t0, $s7, $t0
     lw $s1, var_t_27
     sw $s1, 0($t0)
+    li $s0, 1
+    sw $s0, var_t_28
+    li $s0, 4
+    sw $s0, var_t_30
+    li $s0, 9
+    sw $s0, var_t_32
+    li $s0, 2
+    sw $s0, var_t_33
+    lw $s0, var_t_32
+    lw $s1, var_t_33
+    add $t9, $s0, $s1
+    sw $t9, var_t_31
+    lw $s0, var_t_30
+    lw $s1, var_t_31
+    mul $t9, $s0, $s1
+    sw $t9, var_t_29
+    la $s7, var_arr
+    lw $s0, var_t_28
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $s1, var_t_29
+    sw $s1, 0($t0)
+    li $s0, 1
+    sw $s0, var_t_35
+    la $s7, var_arr
+    lw $s0, var_t_35
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $t9, 0($t0)
+    sw $t9, var_t_34
+    lw $s0, var_t_34
+    sw $s0, var_e
     lw $s0, var_x
     move $a0, $s0
     li $v0, 1
@@ -172,6 +213,13 @@ L_while_end_19:
     li $v0, 11
     syscall
     lw $s0, var_d
+    move $a0, $s0
+    li $v0, 1
+    syscall
+    li $a0, 10
+    li $v0, 11
+    syscall
+    lw $s0, var_e
     move $a0, $s0
     li $v0, 1
     syscall
