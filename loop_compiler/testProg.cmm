@@ -1,25 +1,16 @@
+function add(int a, int b) {
+    return a + b;
+}
+
+function sub(int a, int b) {
+    return a - b;
+}
+
 int x;
 int y;
-int z;
-int arr[5];
 
-x = 3;
-arr[0] = 8 * (3 + 4);
-
-while (x <= 6) {
-    x = x + 1;
-}
-
-if (x > 4) {
-    y = 5;
-    x = x + 6;
-}
-else {
-    y = 4;
-}
-
-z = arr[0] - 2;
+x = add(4, 5);
+y = sub(9, 4);
 
 write x;
 write y;
-write z;

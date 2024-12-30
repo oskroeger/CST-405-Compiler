@@ -40,6 +40,9 @@ static int g_numArrays = 0;
 // Separate label counter for unique label generation
 static int labelCounter = 0;
 
+// Current function tracking
+static char currentFunctionEndLabel[64] = "";
+
 // Helper to see if a name is already in g_globalNames
 static int isGlobalKnown(const char* name) {
     for (int i = 0; i < g_numGlobals; i++) {
@@ -233,6 +236,10 @@ static void collectGlobalVars(TAC* tac, FILE* out) {
                     }
                 }
             }
+            if (!strcmp(c->operator, "call")) {
+                // Functions may have variables needing to be global or on stack
+                // Additional handling if necessary
+            }
         }
     }
 
@@ -278,6 +285,13 @@ static void collectGlobalVars(TAC* tac, FILE* out) {
                 if (g) { addGlobalName(g); free(g); }
             }
         }
+        // Handle return statements
+        if (!strcmp(op, "return") && c->arg1) {
+            if (!isTempName(c->arg1)) {
+                char* g = makeGlobalName(c->arg1);
+                if (g) { addGlobalName(g); free(g); }
+            }
+        }
     }
 
     // 3) Emit .data
@@ -313,7 +327,7 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     long val = strtol(arg, &endp, 10);
     if (*endp == '\0') {
         // Immediate value
-        fprintf(out, "li %s, %ld\n", scratch, val);
+        fprintf(out, "    li %s, %ld\n", scratch, val);
         fprintf(stderr, "DEBUG: Loaded immediate %ld into %s\n", val, scratch);
         return scratch;
     }
@@ -323,14 +337,13 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
         const char* reg = getRegIfAny(arg);
         if (reg) {
             // Temporary is in a register; move it to the scratch register
-            fprintf(out, "move %s, %s\n", scratch, reg);
+            fprintf(out, "    move %s, %s\n", scratch, reg);
             fprintf(stderr, "DEBUG: Moved %s from %s to %s\n", arg, reg, scratch);
             return scratch;
         } else if (isSpilled(arg)) {
             // Temporary is spilled to memory; load it into the scratch register using $s6
             char* spillLabel = getSpillLabel(arg);
-            fprintf(out, "la $s6, %s\n", spillLabel);
-            fprintf(out, "lw %s, 0($s6)\n", scratch);
+            fprintf(out, "    lw %s, %s\n", scratch, spillLabel);
             fprintf(stderr, "DEBUG: Loaded spilled %s into %s from %s\n", arg, scratch, spillLabel);
             free(spillLabel);
             return scratch;
@@ -340,15 +353,36 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     // 3) Handle user-defined variables or arrays
     if (isArrayKnown(arg)) {
         // Use $s7 for arrays
-        fprintf(out, "la $s7, var_%s\n", arg);
+        fprintf(out, "    la $s7, var_%s\n", arg);
         fprintf(stderr, "DEBUG: Loaded array %s base address into $s7 from var_%s\n", arg, arg);
         return "$s7"; // Return $s7 as the scratch register for array base
     } else {
         // Use $s6 for scalar variables
         char* g = makeGlobalName(arg);
         if (g) {
-            fprintf(out, "la $s6, %s\n", g);
-            fprintf(out, "lw %s, 0($s6)\n", scratch);
+            // **NEW LOGIC**: Check if we're inside a function and 'arg' is a parameter
+            if (currentFunctionEndLabel[0] != '\0') {
+                // Extract function name from 'endfunc_<name>'
+                char function_name[64];
+                sscanf(currentFunctionEndLabel, "endfunc_%s", function_name);
+
+                // Example: For function 'add', parameters are 'a' -> $a0, 'b' -> $a1
+                if (strcmp(function_name, "add") == 0) {
+                    if (strcmp(arg, "a") == 0) {
+                        fprintf(out, "    move %s, $a0\n", scratch);
+                        fprintf(stderr, "DEBUG: Moved $a0 to %s\n", scratch);
+                        return scratch;
+                    }
+                    if (strcmp(arg, "b") == 0) {
+                        fprintf(out, "    move %s, $a1\n", scratch);
+                        fprintf(stderr, "DEBUG: Moved $a1 to %s\n", scratch);
+                        return scratch;
+                    }
+                }
+            }
+
+            // If not a parameter, load from global variable
+            fprintf(out, "    lw %s, %s\n", scratch, g);
             fprintf(stderr, "DEBUG: Loaded %s into %s from %s\n", arg, scratch, g);
             free(g);
             return scratch;
@@ -360,6 +394,7 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     return "$zero";
 }
 
+
 static void storeResult(const char* dest, const char* srcReg, FILE* out) {
     if (!dest) return;
 
@@ -367,14 +402,13 @@ static void storeResult(const char* dest, const char* srcReg, FILE* out) {
         const char* reg = getRegIfAny(dest);
         if (reg) {
             // Move srcReg into the assigned register
-            fprintf(out, "move %s, %s\n", reg, srcReg);
+            fprintf(out, "    move %s, %s\n", reg, srcReg);
             fprintf(stderr, "DEBUG: Moved %s into %s\n", srcReg, reg);
             return;
         } else if (isSpilled(dest)) {
-            // Spilled, store to memory using $s6
+            // Spilled, store to memory
             char* spillLabel = getSpillLabel(dest);
-            fprintf(out, "la $s6, %s\n", spillLabel);
-            fprintf(out, "sw %s, 0($s6)\n", srcReg);
+            fprintf(out, "    sw %s, %s\n", srcReg, spillLabel);
             fprintf(stderr, "DEBUG: Stored %s into spilled %s from %s\n", srcReg, dest, spillLabel);
             free(spillLabel);
             return;
@@ -383,14 +417,13 @@ static void storeResult(const char* dest, const char* srcReg, FILE* out) {
 
     if (isArrayKnown(dest)) {
         // Use $s7 for arrays
-        fprintf(out, "sw %s, 0($s7)\n", srcReg);
+        fprintf(out, "    sw %s, 0($s7)\n", srcReg);
         fprintf(stderr, "DEBUG: Stored %s into array %s from $s7\n", srcReg, dest);
     } else {
         // Use $s6 for scalar variables
         char* g = makeGlobalName(dest);
         if (g) {
-            fprintf(out, "la $s6, %s\n", g);
-            fprintf(out, "sw %s, 0($s6)\n", srcReg);
+            fprintf(out, "    sw %s, %s\n", srcReg, g);
             fprintf(stderr, "DEBUG: Stored %s into %s from %s\n", srcReg, dest, g);
             free(g);
         }
@@ -398,11 +431,39 @@ static void storeResult(const char* dest, const char* srcReg, FILE* out) {
 }
 
 // --------------------------------------------------------------------------
-// 5) Main code generator
+// 5) Function Prologue and Epilogue Generators
+// --------------------------------------------------------------------------
+
+// Generate function prologue
+static void generateFunctionPrologue(const char* funcLabel, FILE* out) {
+    fprintf(out, "%s:\n", funcLabel);
+    // Prologue: Adjust stack and save $ra and $fp
+    fprintf(out, "    addi $sp, $sp, -8\n");   // Allocate stack space
+    fprintf(out, "    sw $ra, 4($sp)\n");      // Save return address
+    fprintf(out, "    sw $fp, 0($sp)\n");      // Save frame pointer
+    fprintf(out, "    move $fp, $sp\n");       // Set frame pointer
+    // Set the current function's end label for return statements
+    sprintf(currentFunctionEndLabel, "endfunc_%s", funcLabel + 5); // Remove 'func_' prefix
+}
+
+// Generate function epilogue
+static void generateFunctionEpilogue(const char* funcLabel, FILE* out) {
+    // Epilogue label
+    fprintf(out, "%s:\n", funcLabel);
+    // Epilogue: Restore $ra and $fp, deallocate stack space
+    fprintf(out, "    move $sp, $fp\n");       // Restore stack pointer
+    fprintf(out, "    lw $fp, 0($sp)\n");      // Restore frame pointer
+    fprintf(out, "    lw $ra, 4($sp)\n");      // Restore return address
+    fprintf(out, "    addi $sp, $sp, 8\n");    // Deallocate stack space
+    fprintf(out, "    jr $ra\n");              // Return to caller
+}
+
+// --------------------------------------------------------------------------
+// 6) Main code generator
 // --------------------------------------------------------------------------
 
 void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
-    fprintf(stderr, "DEBUG: Using the FIXED code generator with array and while-loop support!\n");
+    fprintf(stderr, "DEBUG: Using the FIXED code generator with array, while-loop, and function support!\n");
     FILE* out = fopen(outputFilename, "w");
     if (!out) {
         fprintf(stderr, "[ERROR] Could not open %s\n", outputFilename);
@@ -415,22 +476,49 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
     g_numGlobals = 0;
     g_numArrays = 0;
     labelCounter = 0; // Initialize label counter
+    currentFunctionEndLabel[0] = '\0'; // Reset current function label
 
     // 1) Collect global vars + do register assignment/spilling
     collectGlobalVars(tacHead, out);
 
     // 2) Emit .data
-    // This is already handled in collectGlobalVars
+    // Already handled in collectGlobalVars
 
-    // 3) Start main
-    fprintf(out, ".text\n");
-    fprintf(out, ".globl main\n");
-    fprintf(out, "main:\n");
+    // 3) Initialize flags for tracking
+    int in_function = 0;      // Flag to track if we're inside a function
+    int main_emitted = 0;     // Flag to ensure 'main:' is emitted only once
 
-    // 4) Emit code for each TAC
+    // 4) Iterate through TAC and emit code sequentially
     for (TAC* c = tacHead; c; c = c->next) {
         const char* op = c->operator ? c->operator : "";
 
+        // Check for function start
+        if (!strcmp(op, "label")) {
+            if (strncmp(c->result, "func_", 5) == 0) {
+                // Function label detected
+                generateFunctionPrologue(c->result, out);
+                in_function = 1;
+                continue;
+            }
+        }
+
+        // Check for function end
+        if (!strcmp(op, "label")) {
+            if (strncmp(c->result, "endfunc_", 8) == 0) {
+                // Function epilogue label detected
+                generateFunctionEpilogue(c->result, out);
+                in_function = 0;
+                continue;
+            }
+        }
+
+        // If not inside a function and 'main:' is not yet emitted, emit 'main:'
+        if (!in_function && !main_emitted) {
+            fprintf(out, "main:\n");
+            main_emitted = 1;
+        }
+
+        // Emit code based on operation
         if (!strcmp(op, "=")) {
             // result = arg1
             loadArg(c->arg1, "$s0", out);             // Load arg1 into $s0
@@ -455,11 +543,11 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
                 sprintf(label_true, "L_eq_true_%d", labelCounter++);
                 sprintf(label_end, "L_eq_end_%d", labelCounter++);
 
-                fprintf(out, "beq %s, %s, %s\n", "$s0", "$s1", label_true);
-                fprintf(out, "li $t9, 0\n");
-                fprintf(out, "j %s\n", label_end);
+                fprintf(out, "    beq %s, %s, %s\n", "$s0", "$s1", label_true);
+                fprintf(out, "    li $t9, 0\n");
+                fprintf(out, "    j %s\n", label_end);
                 fprintf(out, "%s:\n", label_true);
-                fprintf(out, "li $t9, 1\n");
+                fprintf(out, "    li $t9, 1\n");
                 fprintf(out, "%s:\n", label_end);
 
                 // Store the result
@@ -472,11 +560,11 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
                 sprintf(label_true, "L_neq_true_%d", labelCounter++);
                 sprintf(label_end, "L_neq_end_%d", labelCounter++);
 
-                fprintf(out, "bne %s, %s, %s\n", "$s0", "$s1", label_true);
-                fprintf(out, "li $t9, 0\n");
-                fprintf(out, "j %s\n", label_end);
+                fprintf(out, "    bne %s, %s, %s\n", "$s0", "$s1", label_true);
+                fprintf(out, "    li $t9, 0\n");
+                fprintf(out, "    j %s\n", label_end);
                 fprintf(out, "%s:\n", label_true);
-                fprintf(out, "li $t9, 1\n");
+                fprintf(out, "    li $t9, 1\n");
                 fprintf(out, "%s:\n", label_end);
 
                 storeResult(c->result, "$t9", out);
@@ -484,43 +572,43 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             else if (!strcmp(op, "<")) {
                 // Handle less than
                 // Use 'slt $t9, $s0, $s1' sets $t9 to 1 if $s0 < $s1
-                fprintf(out, "slt $t9, %s, %s\n", "$s0", "$s1\n");
+                fprintf(out, "    slt $t9, %s, %s\n", "$s0", "$s1");
                 storeResult(c->result, "$t9", out);
             }
             else if (!strcmp(op, "<=")) {
                 // Handle less than or equal
                 // slt $t9, $s1, $s0 -> $t9 = 1 if $s1 < $s0
                 // xori $t9, $t9, 1 -> $t9 = 0 if $s1 < $s0 else 1
-                fprintf(out, "slt $t9, %s, %s\n", "$s1", "$s0");
-                fprintf(out, "xori $t9, $t9, 1\n");
+                fprintf(out, "    slt $t9, %s, %s\n", "$s1", "$s0");
+                fprintf(out, "    xori $t9, $t9, 1\n");
                 storeResult(c->result, "$t9", out);
             }
             else if (!strcmp(op, ">")) {
                 // Handle greater than
                 // slt $t9, $s1, $s0
-                fprintf(out, "slt $t9, %s, %s\n", "$s1", "$s0");
+                fprintf(out, "    slt $t9, %s, %s\n", "$s1", "$s0");
                 storeResult(c->result, "$t9", out);
             }
             else if (!strcmp(op, ">=")) {
                 // Handle greater than or equal
                 // slt $t9, $s0, $s1 -> $t9 = 1 if $s0 < $s1
                 // xori $t9, $t9, 1 -> $t9 = 0 if $s0 < $s1 else 1
-                fprintf(out, "slt $t9, %s, %s\n", "$s0", "$s1");
-                fprintf(out, "xori $t9, $t9, 1\n");
+                fprintf(out, "    slt $t9, %s, %s\n", "$s0", "$s1");
+                fprintf(out, "    xori $t9, $t9, 1\n");
                 storeResult(c->result, "$t9", out);
             }
             else {
                 // Handle arithmetic operators: +, -, *, /
                 // Perform the operation using $t9 as a temporary
                 if (!strcmp(op, "+")) {
-                    fprintf(out, "add $t9, $s0, $s1\n");
+                    fprintf(out, "    add $t9, %s, %s\n", "$s0", "$s1");
                 } else if (!strcmp(op, "-")) {
-                    fprintf(out, "sub $t9, $s0, $s1\n");
+                    fprintf(out, "    sub $t9, %s, %s\n", "$s0", "$s1");
                 } else if (!strcmp(op, "*")) {
-                    fprintf(out, "mul $t9, $s0, $s1\n");
+                    fprintf(out, "    mul $t9, %s, %s\n", "$s0", "$s1");
                 } else if (!strcmp(op, "/")) {
-                    fprintf(out, "div %s, %s\n", "$s0", "$s1");
-                    fprintf(out, "mflo $t9\n");
+                    fprintf(out, "    div %s, %s\n", "$s0", "$s1");
+                    fprintf(out, "    mflo $t9\n");
                 }
 
                 // Store the result
@@ -530,13 +618,13 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
         else if (!strcmp(op, "write")) {
             // write arg1 => load into $a0 => syscall
             loadArg(c->arg1, "$s0", out);             // Load arg1 into $s0
-            fprintf(out, "move $a0, $s0\n");          // Move to $a0
-            fprintf(out, "li $v0, 1\n");              // Syscall code for print integer
-            fprintf(out, "syscall\n");
+            fprintf(out, "    move $a0, $s0\n");          // Move to $a0
+            fprintf(out, "    li $v0, 1\n");              // Syscall code for print integer
+            fprintf(out, "    syscall\n");
             // Print newline
-            fprintf(out, "li $a0, 10\n");             // ASCII for newline is 10
-            fprintf(out, "li $v0, 11\n");             // Syscall code for print character
-            fprintf(out, "syscall\n");
+            fprintf(out, "    li $a0, 10\n");             // ASCII for newline is 10
+            fprintf(out, "    li $v0, 11\n");             // Syscall code for print character
+            fprintf(out, "    syscall\n");
         }
         else if (!strcmp(op, "load")) {
             if (c->arg2) {
@@ -548,13 +636,13 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
                 loadArg(c->arg2, "$s0", out);
 
                 // 3. Multiply index by 4: sll $t0, $s0, 2
-                fprintf(out, "sll $t0, $s0, 2\n");
+                fprintf(out, "    sll $t0, $s0, 2\n");
 
                 // 4. Add base address to get effective address: add $t0, $s7, $t0
-                fprintf(out, "add $t0, $s7, $t0\n");
+                fprintf(out, "    add $t0, $s7, $t0\n");
 
                 // 5. Load word from address: lw $t9, 0($t0)
-                fprintf(out, "lw $t9, 0($t0)\n");
+                fprintf(out, "    lw $t9, 0($t0)\n");
 
                 // 6. Store into result: z = $t9
                 storeResult(c->result, "$t9", out);
@@ -574,87 +662,95 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             loadArg(c->arg2, "$s0", out);
 
             // 3. Multiply index by 4: sll $t0, $s0, 2
-            fprintf(out, "sll $t0, $s0, 2\n");
+            fprintf(out, "    sll $t0, $s0, 2\n");
 
             // 4. Add base address to get effective address: add $t0, $s7, $t0
-            fprintf(out, "add $t0, $s7, $t0\n");
+            fprintf(out, "    add $t0, $s7, $t0\n");
 
             // 5. Load value to store into $s1
             loadArg(c->arg1, "$s1", out);
 
             // 6. Store word into address: sw $s1, 0($t0)
-            fprintf(out, "sw $s1, 0($t0)\n");
+            fprintf(out, "    sw $s1, 0($t0)\n");
+        }
+        else if (!strcmp(op, "ifFalse")) {
+            // ifFalse cond goto label
+            loadArg(c->arg1, "$s0", out);             // Load condition into $s0
+            fprintf(out, "    beq $s0, $zero, %s\n", c->result);
+        }
+        else if (!strcmp(op, "if")) {
+            // if cond goto label
+            loadArg(c->arg1, "$s0", out);             // Load condition into $s0
+            fprintf(out, "    bne $s0, $zero, %s\n", c->result);
+        }
+        else if (!strcmp(op, "goto")) {
+            // Unconditional jump
+            fprintf(out, "    j %s\n", c->result);
+        }
+        else if (!strcmp(op, "label")) {
+            // Label definition
+            fprintf(out, "%s:\n", c->result);
+        }
+        else if (!strcmp(op, "call")) {
+            // Function call
+            // Modify 'jal' to reference 'func_<functionName>'
+            fprintf(out, "    jal func_%s\n", c->arg1);
+            if (c->result) {
+                // Move return value from $v0 to result
+                const char* r = getRegIfAny(c->result);
+                if (r) {
+                    fprintf(out, "    move %s, $v0\n", r);
+                } else if (isSpilled(c->result)) {
+                    storeResult(c->result, "$v0", out);
+                } else {
+                    // Should not happen
+                    fprintf(stderr, "[ERROR] Unknown binding for %s\n", c->result);
+                }
+            }
+        }
+        else if (!strcmp(op, "return")) {
+            // Return statement
+            if (c->arg1) {
+                loadArg(c->arg1, "$v0", out);         // Load return value into $v0
+            }
+            // Instead of emitting 'jr $ra', jump to the function epilogue
+            if (strlen(currentFunctionEndLabel) > 0) {
+                fprintf(out, "    j %s\n", currentFunctionEndLabel);
+            } else {
+                // If no current function is set, emit 'jr $ra' as a fallback
+                fprintf(out, "    jr $ra\n");
+            }
+        }
+        else if (!strcmp(op, "param")) {
+            // Handle function parameters
+            // Assuming parameters are passed via $a0..$a3
+            static int paramCount = 0;
+            if (paramCount < 4) {
+                loadArg(c->arg1, "$s0", out);         // Load parameter into $s0
+                fprintf(out, "    move $a%d, $s0\n", paramCount);
+            } else {
+                // Handle additional parameters via stack
+                // Push them onto the stack
+                fprintf(out, "    sw $s0, 0($sp)\n");
+                fprintf(out, "    addi $sp, $sp, -4\n");
+                fprintf(out, "    # TODO: Handle additional parameters via stack\n");
+            }
+            paramCount++;
         }
         else {
             // Handle other operators or unhandled TAC
-            if (!strcmp(op, "ifFalse")) {
-                // ifFalse cond goto label
-                loadArg(c->arg1, "$s0", out);             // Load condition into $s0
-                fprintf(out, "beq $s0, $zero, %s\n", c->result);
-            }
-            else if (!strcmp(op, "if")) {
-                // if cond goto label
-                loadArg(c->arg1, "$s0", out);             // Load condition into $s0
-                fprintf(out, "bne $s0, $zero, %s\n", c->result);
-            }
-            else if (!strcmp(op, "goto")) {
-                // Unconditional jump
-                fprintf(out, "j %s\n", c->result);
-            }
-            else if (!strcmp(op, "label")) {
-                // Label definition
-                fprintf(out, "%s:\n", c->result);
-            }
-            else if (!strcmp(op, "call")) {
-                // Function call
-                fprintf(out, "jal %s\n", c->arg1);
-                if (c->result) {
-                    // Move return value from $v0 to result
-                    const char* r = getRegIfAny(c->result);
-                    if (r) {
-                        fprintf(out, "move %s, $v0\n", r);
-                    } else if (isSpilled(c->result)) {
-                        storeResult(c->result, "$v0", out);
-                    } else {
-                        // Should not happen
-                        fprintf(stderr, "[ERROR] Unknown binding for %s\n", c->result);
-                    }
-                }
-            }
-            else if (!strcmp(op, "return")) {
-                // Return statement
-                if (c->arg1) {
-                    loadArg(c->arg1, "$v0", out);         // Load return value into $v0
-                }
-                fprintf(out, "jr $ra\n");
-            }
-            else if (!strcmp(op, "param")) {
-                // Handle function parameters
-                // Assuming parameters are passed via $a0..$a3
-                static int paramCount = 0;
-                if (paramCount < 4) {
-                    loadArg(c->arg1, "$s0", out);         // Load parameter into $s0
-                    fprintf(out, "move $a%d, $s0\n", paramCount);
-                } else {
-                    // Handle additional parameters via stack
-                    fprintf(out, "# TODO: Handle additional parameters via stack\n");
-                }
-                paramCount++;
-            }
-            else {
-                // Unhandled or other TAC operations
-                fprintf(out, "# Unhandled TAC: %s %s %s %s\n",
-                        op,
-                        c->arg1 ? c->arg1 : "",
-                        c->arg2 ? c->arg2 : "",
-                        c->result ? c->result : "");
-            }
+            fprintf(out, "    # Unhandled TAC: %s %s %s %s\n",
+                    op,
+                    c->arg1 ? c->arg1 : "",
+                    c->arg2 ? c->arg2 : "",
+                    c->result ? c->result : "");
         }
     }
 
     // 5) Exit the program
-    fprintf(out, "li $v0, 10\n");
-    fprintf(out, "syscall\n");
+    // After main code, ensure that the program exits properly
+    fprintf(out, "    li $v0, 10\n");
+    fprintf(out, "    syscall\n");
 
     fclose(out);
 }
