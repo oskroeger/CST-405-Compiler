@@ -1,0 +1,54 @@
+function add(int a, int b) {
+    return a + b;
+}
+
+function sub(int a, int b) {
+    return a - b;
+}
+
+int x;
+int y;
+int z;
+int d;
+int e;
+
+
+int arr[5];
+
+float p;
+float q;
+float pq;
+p= 1.1;
+q= 2.3;
+pq =p+q;
+
+
+
+x = add(4, 5);
+y = sub(9, 4);
+
+if (x > 4) {
+    z = 7;
+}
+else {
+    z = 8;
+}
+
+d = 1;
+
+while (d <= 2) {
+    d = d + 1;
+}
+
+arr[0] = d;
+arr[1] = 4 * (9 + 2);
+
+e = arr[1];
+
+write x;
+write y;
+write z;
+write d;
+write e;
+
+write pq;
