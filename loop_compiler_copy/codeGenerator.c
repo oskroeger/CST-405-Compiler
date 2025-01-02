@@ -294,6 +294,23 @@ static void collectGlobalVars(TAC* tac, FILE* out) {
                 char* g = makeGlobalName(c->result);
                 if (g) { addGlobalName(g); free(g); }
             }
+        } else if (!strcmp(op, "f+") || !strcmp(op, "f-") ||
+            !strcmp(op, "f*") || !strcmp(op, "f/") ||
+            !strcmp(op, "f==") || !strcmp(op, "f!=") ||
+            !strcmp(op, "f<") || !strcmp(op, "f<=") ||
+            !strcmp(op, "f>") || !strcmp(op, "f>=")) {
+            if (c->arg1 && !isTempName(c->arg1)) {
+                char* g = makeGlobalName(c->arg1);
+                if (g) { addGlobalName(g); free(g); }
+            }
+            if (c->arg2 && !isTempName(c->arg2)) {
+                char* g = makeGlobalName(c->arg2);
+                if (g) { addGlobalName(g); free(g); }
+            }
+            if (c->result && !isTempName(c->result)) {
+                char* g = makeGlobalName(c->result);
+                if (g) { addGlobalName(g); free(g); }
+            }
         }
         // Handle return statements
         if (!strcmp(op, "return") && c->arg1) {
@@ -398,6 +415,91 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     return "$zero";
 }
 
+static const char* loadFloatArg(const char* arg, const char* fReg, FILE* out) {
+    if (!arg) return fReg;
+
+    // 1) Check if `arg` is a float literal
+    //    We can see if it has a '.' or try to parse as float, etc.
+    //    Or if your IR always sets "t_XXX" or "ft_XXX" for temps, you can handle that logic differently.
+    
+    char* endp;
+    float floatVal = strtof(arg, &endp);
+    if (*endp == '\0') {
+        // This means arg was purely numeric => float literal
+        // We might store it in a temp data label or load immediate
+        // MIPS doesn't have a "li.s $fX, immediate" so we do:
+        
+        //  A) create a label in .data for this literal
+        //  B) load it with la + l.s
+        static int floatLiteralCount = 0;
+        char labelName[32];
+        sprintf(labelName, "LC_flt_%d", floatLiteralCount++);
+        fprintf(out, ".data\n");
+        fprintf(out, "%s: .float %f\n", labelName, floatVal);
+        fprintf(out, ".text\n");
+
+        // la $t0, labelName
+        // l.s $fReg, 0($t0)
+        fprintf(out, "    la $t0, %s\n", labelName);
+        fprintf(out, "    l.s %s, 0($t0)\n", fReg);
+        return fReg;
+    }
+
+    // 2) If arg is a temp like t_5 or ft_5
+    //    We can see if it's in a float register or spilled
+    if (isTempName(arg)) {
+        // If we do no separate float vs int registers, we might need to see if it's "ft_"
+        // But let's assume we just do "t_5" => we track in a separate binding or logic.
+        // We'll do a simple approach:
+        // See if it's spilled => load with l.s
+        // else if in register => use 'mov.s' (like "move" but for floats)...
+
+        // For simplicity in your code, you might say "We always spill floats" or something,
+        // but let's do a naive version:
+        
+        // There's no direct float binding logic in your code yet,
+        // so let's assume we store float temps in memory (spilled).
+        
+        if (isSpilled(arg)) {
+            char* spillLabel = getSpillLabel(arg);  // e.g. var_t_5
+            fprintf(out, "    l.s %s, %s\n", fReg, spillLabel);
+            free(spillLabel);
+            return fReg;
+        } else {
+            // If not spilled, we might need a separate approach
+            // (like if you introduced separate $f registers in your register manager).
+            // For now, let's fallback:
+            fprintf(stderr, "[ERROR] float temp in register not fully handled\n");
+            fprintf(out, "    # TODO: handle float temp in register\n");
+            return fReg;
+        }
+    }
+
+    // 3) If it's a user-defined float variable:
+    //    We'll do something similar to your loadArg code, but using l.s
+    if (isArrayKnown(arg)) {
+        // For arrays, you'd do la + offset, then l.s. 
+        // We'll skip the details here, as in your code you handle it differently.
+        fprintf(stderr, "[ERROR] float array not handled yet.\n");
+        return fReg;
+    } else {
+        // Normal scalar variable => "var_x"
+        char* g = makeGlobalName(arg);
+        if (g) {
+            // e.g. "var_x"
+            // Use l.s to load the float
+            fprintf(out, "    l.s %s, %s\n", fReg, g);
+            free(g);
+            return fReg;
+        }
+    }
+
+    // If all else fails:
+    fprintf(stderr, "[ERROR] loadFloatArg: could not handle arg '%s'\n", arg);
+    return fReg;
+}
+
+
 static void storeResult(const char* dest, const char* srcReg, FILE* out) {
     if (!dest) return;
 
@@ -432,6 +534,39 @@ static void storeResult(const char* dest, const char* srcReg, FILE* out) {
         }
     }
 }
+
+static void storeFloatResult(const char* dest, const char* fReg, FILE* out) {
+    if (!dest) return;
+
+    if (isTempName(dest)) {
+        // If spilled, store with s.s
+        if (isSpilled(dest)) {
+            char* spillLabel = getSpillLabel(dest);
+            fprintf(out, "    s.s %s, %s\n", fReg, spillLabel);
+            fprintf(stderr, "DEBUG: Stored float %s into spilled %s\n", fReg, dest);
+            free(spillLabel);
+        } else {
+            // If we had a dedicated float register assignment, we'd do something like:
+            fprintf(stderr, "[ERROR] storeFloatResult for in-register float temps not implemented.\n");
+        }
+        return;
+    }
+
+    // If it's a user variable:
+    if (isArrayKnown(dest)) {
+        // array store => s.s ...
+        fprintf(stderr, "[ERROR] storeFloatResult for array not implemented.\n");
+    } else {
+        char* g = makeGlobalName(dest);
+        if (g) {
+            fprintf(out, "    s.s %s, %s\n", fReg, g);
+            free(g);
+        } else {
+            fprintf(stderr, "[ERROR] storeFloatResult: cannot handle '%s'\n", dest);
+        }
+    }
+}
+
 
 // --------------------------------------------------------------------------
 // 5) Function Prologue and Epilogue Generators

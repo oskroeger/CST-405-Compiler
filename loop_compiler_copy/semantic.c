@@ -6,9 +6,13 @@
 // A helper function to generate unique temporary names.
 static int tempCounter = 0;
 static int floatCounter = 0;
-static char* newTemp() {
+static char* newTemp(DataType type) {
     char* buffer = (char*)malloc(20);
-    sprintf(buffer, "t_%d", tempCounter++);
+    if (type == TYPE_F) {
+        sprintf(buffer, "f_%d", floatCounter++);
+    } else{
+        sprintf(buffer, "t_%d", tempCounter++);
+    }
     return buffer;
 }
 
@@ -72,13 +76,13 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
         case NodeType_AssignStmt: {
             if (node->assignStmt.isArray) {
-                char* indexTemp = newTemp();
+                char* indexTemp = newTemp( node->assignStmt.arrayIndex->dataType);
                 code = appendTAC(code, generateTAC(node->assignStmt.arrayIndex, indexTemp));
-                char* rhsTemp = newTemp();
+                char* rhsTemp = newTemp(node->assignStmt.expr->dataType);
                 code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTemp));
                 code = appendTAC(code, createTAC("store", rhsTemp, indexTemp, node->assignStmt.varName));
             } else {
-                char* rhsTarget = target ? strdup(target) : newTemp();
+                char* rhsTarget = target ? strdup(target) : newTemp(node->assignStmt.expr->dataType);
                 code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTarget));
                 code = appendTAC(code, createTAC("=", rhsTarget, NULL, node->assignStmt.varName));
             }
@@ -86,19 +90,19 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_Expr: {
-            char* lhsTemp = newTemp();
-            char* rhsTemp = newTemp();
+            char* lhsTemp = newTemp(node->expr.left->dataType);
+            char* rhsTemp = newTemp(node->expr.right->dataType);
             code = appendTAC(code, generateTAC(node->expr.left, lhsTemp));
             code = appendTAC(code, generateTAC(node->expr.right, rhsTemp));
 
-            char* resultTemp = target ? target : newTemp();
+            char* resultTemp = target ? target : newTemp(node->expr.left->dataType);
             code = appendTAC(code, createTAC(node->expr.operator, lhsTemp, rhsTemp, resultTemp));
             printf ("[INFO] Generated TAC for expression: %s = %s %s %s\n", resultTemp, lhsTemp, node->expr.operator, rhsTemp);
             break;
         }
 
         case NodeType_IntExpr: {
-            char* resultTemp = target ? target : newTemp();
+            char* resultTemp = target ? target : newTemp(TYPE_I);
             TAC* instr = createTAC("=", NULL, NULL, resultTemp);
             instr->arg1 = (char*)malloc(20);
             sprintf(instr->arg1, "%d", node->IntExpr.integer);
@@ -108,7 +112,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_FloatExpr: {
-            char* resultTemp = target ? target : newTemp();
+            char* resultTemp = target ? target : newTemp(TYPE_F);
             TAC* instr = createTAC("=", NULL, NULL, resultTemp);
             instr->arg1 = (char*)malloc(20);
             sprintf(instr->arg1, "%f", node->FloatExpr.floatNum);
@@ -119,15 +123,15 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_SimpleID: {
-            char* resultTemp = target ? target : newTemp();
+            char* resultTemp = target ? target : newTemp(TYPE_I);
             code = appendTAC(code, createTAC("load", node->simpleID.name, NULL, resultTemp));
             break;
         }
 
         case NodeType_ArrayAccess: {
-            char* indexTemp = newTemp();
+            char* indexTemp = newTemp(node->arrayAccess.index->dataType);
             code = appendTAC(code, generateTAC(node->arrayAccess.index, indexTemp));
-            char* resultTemp = target ? target : newTemp();
+            char* resultTemp = target ? target : newTemp(TYPE_I);
             code = appendTAC(code, createTAC("load", node->arrayAccess.arrayName, indexTemp, resultTemp));
             break;
         }
@@ -137,7 +141,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
             break;
 
         case NodeType_IfStmt: {
-            char* condTemp = newTemp();
+            char* condTemp = newTemp(node->ifStmt.condition->dataType);
             code = appendTAC(code, generateTAC(node->ifStmt.condition, condTemp));
 
             char* labelThen = strdup("L_then");
@@ -155,7 +159,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_ReturnStmt: {
-            char* retTemp = newTemp();
+            char* retTemp = newTemp(node->returnStmt.expr->dataType);
             code = appendTAC(code, generateTAC(node->returnStmt.expr, retTemp));
             code = appendTAC(code, createTAC("return", retTemp, NULL, NULL));
             break;
@@ -178,7 +182,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
             int argCount=0;
             while (argList && argList->type == NodeType_StmtList) {
                 ASTNode* singleArg = argList->stmtList.stmt;
-                char* argTemp = newTemp();
+                char* argTemp = newTemp(node->dataType);
                 argCode = appendTAC(argCode, generateTAC(singleArg, argTemp));
                 // param argTemp
                 argCode = appendTAC(argCode, createTAC("param", argTemp, NULL, NULL));
@@ -205,7 +209,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
             code = appendTAC(code, createTAC("label", NULL, NULL, startLabel));
 
             // Generate TAC for the loop condition
-            char* condTemp = newTemp();
+            char* condTemp = newTemp(node->whileStmt.condition->dataType);
             code = appendTAC(code, generateTAC(node->whileStmt.condition, condTemp));
 
             // Add a conditional jump to the end of the loop if the condition is false
@@ -246,6 +250,12 @@ void printTAC(TAC* tac) {
                    strcmp(current->operator, "*") == 0 ||
                    strcmp(current->operator, "/") == 0)) {
             printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
+        } else if (current->operator && 
+                  (strcmp(current->operator, "f+") == 0 ||
+                   strcmp(current->operator, "f-") == 0 ||
+                   strcmp(current->operator, "f*") == 0 ||
+                   strcmp(current->operator, "f/") == 0)) {
+            printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
         } else if (current->operator &&
                    (strcmp(current->operator, "==") == 0 ||
                     strcmp(current->operator, "!=") == 0 ||
@@ -253,6 +263,14 @@ void printTAC(TAC* tac) {
                     strcmp(current->operator, "<=") == 0 ||
                     strcmp(current->operator, ">") == 0 ||
                     strcmp(current->operator, ">=") == 0)) {
+            printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
+        }else if (current->operator &&
+                   (strcmp(current->operator, "f==") == 0 ||
+                    strcmp(current->operator, "f!=") == 0 ||
+                    strcmp(current->operator, "f<") == 0 ||
+                    strcmp(current->operator, "f<=") == 0 ||
+                    strcmp(current->operator, "f>") == 0 ||
+                    strcmp(current->operator, "f>=") == 0)) {
             printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
         } else if (current->operator && strcmp(current->operator, "write") == 0) {
             printf("write %s\n", current->arg1);
