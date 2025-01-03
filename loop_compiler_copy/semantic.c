@@ -112,6 +112,8 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
             // check if it s a float operation
             if (node->expr.left->dataType == TYPE_F || node->expr.right->dataType == TYPE_F) {
+                //change the operator to f operator
+
                 printf ("[INFO] Generated TAC for expression: %s f= %s %s %s\n", resultTemp, lhsTemp, node->expr.operator, rhsTemp);
 
             } else {
@@ -156,7 +158,13 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_WriteStmt:
-            code = appendTAC(code, createTAC("write", node->writeStmt.id, NULL, NULL));
+            // check teh type of the id first
+            if (lookupTypeInSymbolTable(currentScope, node->writeStmt.id) == TYPE_INT) {
+                code = appendTAC(code, createTAC("write", node->writeStmt.id, NULL, NULL));
+            } else {
+                code = appendTAC(code, createTAC("fwrite", node->writeStmt.id, NULL, NULL));
+            }
+            //code = appendTAC(code, createTAC("write", node->writeStmt.id, NULL, NULL));
             break;
 
         case NodeType_IfStmt: {
@@ -266,19 +274,19 @@ void printTAC(TAC* tac) {
             printf("%s = %s\n", current->result, current->arg1);
         } else if (current->operator && strcmp(current->operator, "f=") == 0) {
             printf("%s f= %s\n", current->result, current->arg1);
-        } else if (current->operator && 
+        } else if (current->operator && strcmp(current->operator, "=") &&
                   (strcmp(current->operator, "+") == 0 ||
                    strcmp(current->operator, "-") == 0 ||
                    strcmp(current->operator, "*") == 0 ||
                    strcmp(current->operator, "/") == 0)) {
             printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
-        } else if (current->operator && 
+        } else if (current->operator && strcmp(current->operator, "f=") &&
                   (strcmp(current->operator, "f+") == 0 ||
                    strcmp(current->operator, "f-") == 0 ||
                    strcmp(current->operator, "f*") == 0 ||
                    strcmp(current->operator, "f/") == 0)) {
-            printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
-        } else if (current->operator &&
+            printf("%s f= %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
+        } else if (current->operator && strcmp(current->operator, "=") &&
                    (strcmp(current->operator, "==") == 0 ||
                     strcmp(current->operator, "!=") == 0 ||
                     strcmp(current->operator, "<") == 0 ||
@@ -286,16 +294,18 @@ void printTAC(TAC* tac) {
                     strcmp(current->operator, ">") == 0 ||
                     strcmp(current->operator, ">=") == 0)) {
             printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
-        }else if (current->operator &&
+        }else if (current->operator && strcmp(current->operator, "f=") &&
                    (strcmp(current->operator, "f==") == 0 ||
                     strcmp(current->operator, "f!=") == 0 ||
                     strcmp(current->operator, "f<") == 0 ||
                     strcmp(current->operator, "f<=") == 0 ||
                     strcmp(current->operator, "f>") == 0 ||
                     strcmp(current->operator, "f>=") == 0)) {
-            printf("%s = %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
+            printf("%s f= %s %s %s\n", current->result, current->arg1, current->operator, current->arg2);
         } else if (current->operator && strcmp(current->operator, "write") == 0) {
             printf("write %s\n", current->arg1);
+        } else if (current->operator && strcmp(current->operator, "fwrite") == 0) {
+            printf("fwrite %s\n", current->arg1);
         } else if (current->operator && strcmp(current->operator, "load") == 0) {
             // detemine if its = or f=  based on the type of the result
             char* equals = (lookupTypeInSymbolTable(currentScope, current->arg1) == TYPE_FLOAT) ? "f=" : "=";

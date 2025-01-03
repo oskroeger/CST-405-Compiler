@@ -25,17 +25,19 @@ var_t_35: .word 0
 var_t_34: .word 0
 var_a: .word 0
 var_b: .word 0
+var_f_0: .word 0
 var_p: .word 0
+var_f_1: .word 0
 var_q: .word 0
 var_f_3: .word 0
 var_f_4: .word 0
 var_f_2: .word 0
+var_pq: .word 0
 var_x: .word 0
 var_y: .word 0
 var_z: .word 0
 var_d: .word 0
 var_e: .word 0
-var_pq: .word 0
 var_arr: .word 0, 0, 0, 0, 0
 
 .text
@@ -82,26 +84,20 @@ endfunc_sub:
     addi $sp, $sp, 8
     jr $ra
 main:
-.data
-LC_flt_0: .float 1.100000
-.text
-    la $t0, LC_flt_0
-    l.s $f0, 0($t0)
-    s.s $f0, var_f_0
     l.s $f0, var_f_0
     s.s $f0, var_p
 .data
-LC_flt_1: .float 2.300000
+LC_flt_0: .float 2.300000
 .text
-    la $t0, LC_flt_1
+    la $t0, LC_flt_0
     l.s $f0, 0($t0)
     s.s $f0, var_f_1
     l.s $f0, var_f_1
     s.s $f0, var_q
-    lw $s0, var_p
-    sw $s0, var_f_3
-    lw $s0, var_q
-    sw $s0, var_f_4
+    l.s $f0, var_p
+    s.s $f0, var_f_3
+    l.s $f0, var_q
+    s.s $f0, var_f_4
     l.s $f0, var_f_3
     l.s $f1, var_f_4
     add.s $f2, $f0, $f1
@@ -258,12 +254,8 @@ L_while_end_19:
     li $a0, 10
     li $v0, 11
     syscall
-    lw $s0, var_pq
-    move $a0, $s0
-    li $v0, 1
-    syscall
-    li $a0, 10
-    li $v0, 11
+    l.s $f12, var_pq
+    li $v0, 2
     syscall
     li $v0, 10
     syscall

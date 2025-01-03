@@ -293,7 +293,7 @@ static void collectGlobalVars(TAC* tac, FILE* out) {
         const char* op = c->operator ? c->operator : "";
 
         // For assignment or write/load, etc.
-        if (!strcmp(op, "=") && c->result) {
+        if ((!strcmp(op, "=") || !strcmp(op, "f=")) && c->result) {
             if (!isTempName(c->result)) {
                 // **NEW LOGIC**: Exclude parameters from global variables
                 int is_param = 0;
@@ -645,6 +645,16 @@ static void generateFunctionEpilogue(const char* funcLabel, FILE* out) {
 // 6) Main code generator
 // --------------------------------------------------------------------------
 
+// Helper method to determing if an expression is a float expression
+static int isEitherFloatTemp(const char* a, const char* b) {
+    // Return 1 if either a or b is a float temp
+    // We'll rely on your isTempName returning 2 for float
+    if (a && isTempName(a) == 2) return 1;
+    if (b && isTempName(b) == 2) return 1;
+    return 0;
+}
+
+
 void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
     fprintf(stderr, "DEBUG: Using the FIXED code generator with array, while-loop, and function support!\n");
     FILE* out = fopen(outputFilename, "w");
@@ -703,18 +713,20 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             fprintf(out, "main:\n");
             main_emitted = 1;
         }
-
-        // Emit code based on operation
-        if (!strcmp(op, "=")) {
-            // result = arg1
-            loadArg(c->arg1, "$s0", out);             // Load arg1 into $s0
-            storeResult(c->result, "$s0", out);      // Store from $s0 to result
-        }
-        else if (!strcmp(op, "f=")) {
+        // if op is = and the any of teh args containg f like this f_2 f= f_3 f+ f_4
+        else if ( (!strcmp(op, "=") && isEitherFloatTemp(c->arg1, c->result)) || !strcmp(op, "f=") ) {
             // result = arg1, but both are float
             loadFloatArg(c->arg1, "$f0", out);     // load the float source into $f0
             storeFloatResult(c->result, "$f0", out); // store into result
         }
+
+        // Emit code based on operation
+        else if (!strcmp(op, "=")) {
+            // result = arg1
+            loadArg(c->arg1, "$s0", out);             // Load arg1 into $s0
+            storeResult(c->result, "$s0", out);      // Store from $s0 to result
+        }
+
 
         else if (!strcmp(op, "f+") || !strcmp(op, "f-") ||
          !strcmp(op, "f*") || !strcmp(op, "f/") ||
@@ -972,6 +984,13 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             fprintf(out, "    li $v0, 11\n");             // Syscall code for print character
             fprintf(out, "    syscall\n");
         }
+        else if (!strcmp(op, "fwrite")) {
+            // float print
+            fprintf(out, "    l.s $f12, var_%s\n", c->arg1);
+            fprintf(out, "    li $v0, 2\n");
+            fprintf(out, "    syscall\n");
+        }
+
         else if (!strcmp(op, "load")) {
             if (c->arg2) {
                 // Array access: result = load arr[index]
@@ -995,11 +1014,35 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             }
             else {
                 // Simple load: result = load var
-                loadArg(c->arg1, "$s0", out);             // Load arg1 into $s0
-                storeResult(c->result, "$s0", out);      // Store from $s0 to result
+                // ***Check if 'c->arg1' is a float var or float temp***
+                int isFloat = 0;
+
+                // 1) If it's a temp named "f_#", it's float
+                if (isTempName(c->arg1) == 2) {
+                    isFloat = 1;
+                } else {
+                    // 2) If it's a user variable, check the symbol table
+                    SymbolType st = lookupTypeInSymbolTable(currentScope, c->arg1);
+                    if (st == TYPE_FLOAT) {
+                        isFloat = 1;
+                    }
+                }
+
+                if (isFloat) {
+                    // float load
+                    loadFloatArg(c->arg1, "$f0", out);
+                    // store into c->result
+                    storeFloatResult(c->result, "$f0", out);
+                } else {
+                    // integer load
+                    loadArg(c->arg1, "$s0", out);
+                    storeResult(c->result, "$s0", out);
+                }
             }
         }
+        
         else if (!strcmp(op, "store")) {
+
             // store arg1 into result[arg2]
             // 1. Load base address of array into $s7
             loadArg(c->result, "$s7", out);             // Load base address into $s7
@@ -1021,13 +1064,62 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
         }
         else if (!strcmp(op, "ifFalse")) {
             // ifFalse cond goto label
+            // chekc if the condition is a float
+            if (isEitherFloatTemp(c->arg1, c->arg2)) {
+                // 1) Load float arguments into registers, e.g. $f0 and $f1
+                loadFloatArg(c->arg1, "$f0", out);
+                loadFloatArg(c->arg2, "$f1", out);
+
+                // 2) If it's one of the arithmetic ops (f+, f-, f*, f/), do add.s etc.
+                if (!strcmp(op, "ifFalse")) {
+                    // Handle equality
+                    // Compare $s0 and $s1, set $t9 to 1 if equal, else 0
+                    // Generate unique labels
+                    char label_true[64];
+                    char label_end[64];
+                    sprintf(label_true, "L_eq_true_%d", labelCounter++);
+                    sprintf(label_end, "L_eq_end_%d", labelCounter++);
+
+                    fprintf(out, "    beq %s, %s, %s\n", "$f0", "$f1", label_true);
+                    fprintf(out, "    j %s\n", label_end);
+                    fprintf(out, "%s:\n", label_true);
+                    fprintf(out, "    j %s\n", c->result);
+                    fprintf(out, "%s:\n", label_end);
+                }
+            } else {
             loadArg(c->arg1, "$s0", out);             // Load condition into $s0
             fprintf(out, "    beq $s0, $zero, %s\n", c->result);
+            } 
         }
         else if (!strcmp(op, "if")) {
-            // if cond goto label
-            loadArg(c->arg1, "$s0", out);             // Load condition into $s0
-            fprintf(out, "    bne $s0, $zero, %s\n", c->result);
+            //check if the condition is a float
+            if (isEitherFloatTemp(c->arg1, c->arg2)) {
+                // 1) Load float arguments into registers, e.g. $f0 and $f1
+                loadFloatArg(c->arg1, "$f0", out);
+                loadFloatArg(c->arg2, "$f1", out);
+
+                // 2) If it's one of the arithmetic ops (f+, f-, f*, f/), do add.s etc.
+                if (!strcmp(op, "if")) {
+                    // Handle equality
+                    // Compare $s0 and $s1, set $t9 to 1 if equal, else 0
+                    // Generate unique labels
+                    char label_true[64];
+                    char label_end[64];
+                    sprintf(label_true, "L_eq_true_%d", labelCounter++);
+                    sprintf(label_end, "L_eq_end_%d", labelCounter++);
+
+                    fprintf(out, "    beq %s, %s, %s\n", "$f0", "$f1", label_true);
+                    fprintf(out, "    j %s\n", label_end);
+                    fprintf(out, "%s:\n", label_true);
+                    fprintf(out, "    j %s\n", c->result);
+                    fprintf(out, "%s:\n", label_end);
+                }
+            } else {
+                // if cond goto label
+                loadArg(c->arg1, "$s0", out);             // Load condition into $s0
+                fprintf(out, "    bne $s0, $zero, %s\n", c->result);
+            }
+            
         }
         else if (!strcmp(op, "goto")) {
             // Unconditional jump
@@ -1057,29 +1149,56 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
         }
         else if (!strcmp(op, "return")) {
             // Return statement
-            if (c->arg1) {
-                loadArg(c->arg1, "$v0", out);         // Load return value into $v0
-            }
-            // Instead of emitting 'jr $ra', jump to the function epilogue
-            if (strlen(currentFunctionEndLabel) > 0) {
-                fprintf(out, "    j %s\n", currentFunctionEndLabel);
+            //check if the return value is a float
+            if (isTempName(c->arg1) == 2) {
+                // Load float return value into $f0
+                loadFloatArg(c->arg1, "$f0", out);
+                // Instead of emitting 'jr $ra', jump to the function epilogue
+                if (strlen(currentFunctionEndLabel) > 0) {
+                    fprintf(out, "    j %s\n", currentFunctionEndLabel);
+                } else {
+                    // If no current function is set, emit 'jr $ra' as a fallback
+                    fprintf(out, "    jr $ra\n");
+                }
             } else {
-                // If no current function is set, emit 'jr $ra' as a fallback
-                fprintf(out, "    jr $ra\n");
+                // Load return value into $v0
+                loadArg(c->arg1, "$v0", out);
+                // Instead of emitting 'jr $ra', jump to the function epilogue
+                if (strlen(currentFunctionEndLabel) > 0) {
+                    fprintf(out, "    j %s\n", currentFunctionEndLabel);
+                } else {
+                    // If no current function is set, emit 'jr $ra' as a fallback
+                    fprintf(out, "    jr $ra\n");
+                }
             }
+            
         }
         else if (!strcmp(op, "param")) {
             // Handle function parameters
             // Assuming parameters are passed via $a0..$a3
-            if (paramCount < 4) {
+            //check if the parameter is a float
+            if (isTempName(c->arg1) == 2) {
+                // Load float parameter into $f0
+                loadFloatArg(c->arg1, "$f0", out);
+                fprintf(out, "    mov.s $f%d, $f0\n", paramCount);
+            } else if (paramCount < 4) {
                 loadArg(c->arg1, "$s0", out);         // Load parameter into $s0
                 fprintf(out, "    move $a%d, $s0\n", paramCount);
             } else {
                 // Handle additional parameters via stack
                 // Push them onto the stack
-                fprintf(out, "    sw $s0, 0($sp)\n");
-                fprintf(out, "    addi $sp, $sp, -4\n");
-                fprintf(out, "    # TODO: Handle additional parameters via stack\n");
+                //check if the parameter is a float
+                if (isTempName(c->arg1) == 2) {
+                    // Load float parameter into $f0
+                    loadFloatArg(c->arg1, "$f0", out);
+                    fprintf(out, "    swc1 $f0, 0($sp)\n");
+                    fprintf(out, "    addi $sp, $sp, -4\n");
+                } else {
+                    loadArg(c->arg1, "$s0", out);         // Load parameter into $s0
+                    fprintf(out, "    sw $s0, 0($sp)\n");
+                    fprintf(out, "    addi $sp, $sp, -4\n");
+                }
+
             }
             paramCount++;
         }
