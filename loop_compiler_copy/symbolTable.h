@@ -68,6 +68,7 @@ void addArraySymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue
 void addFunctionSymbol(SymbolTable* table, char* name);
 Symbol* lookupSymbol(SymbolTable* table, char* name);
 void printSymbolTable(const ScopeNode* scopeListHead);
+SymbolType lookupTypeInSymbolTable(SymbolTable* table, const char* name) ;
 
 // Helper function to convert SymbolType to a string
 const char* symbolTypeToString(SymbolType type);

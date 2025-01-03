@@ -8,6 +8,7 @@
 // --------------------------------------------------------------------------
 
 #define MAX_REGS 10  // Number of MIPS registers we'll use for temps ($t0..$t9)
+#define MAX_FLOAT_REGS 10  // Number of MIPS registers we'll use for float temps ($f0..$f9)
 #define MAX_TEMPS 200
 #define MAX_LABELS 1000
 
@@ -22,6 +23,7 @@ static int g_numTempBindings = 0;
 
 // Next free register index in [0..MAX_REGS-1]
 static int g_nextRegIndex = 0;
+static int g_nextFloatRegIndex = 0;
 
 // We'll store the names of user-defined variables, arrays, and spilled temps
 // so we can declare them in .data later.
@@ -79,19 +81,30 @@ static void addArray(const char* name, int size) {
     g_numArrays++;
 }
 
-// Return 1 if `str` is "t<number>" or "t_<number>", else 0
+// Return 1 if `str` is "t<number>" or "t_<number>", , 2 if its float or else 0
 static int isTempName(const char* str) {
     if (!str) return 0;
-    if (str[0] != 't') return 0;
-    int i = 1;
-    if (str[i] == '_') i++;
-    if (!str[i]) return 0; // No digits after 't' or 't_'
-    for (; str[i]; i++) {
-        if (str[i] < '0' || str[i] > '9') {
-            return 0;
+    // 1) Check if 'f' for float
+    if (strncmp(str, "f", 2) == 0) {
+        int i = 2;
+        if (str[i] == '_') i++;
+        if (!str[i]) return 0; // no digits
+        for (; str[i]; i++) {
+            if (str[i] < '0' || str[i] > '9') return 0;
         }
+        return 2;  // float
     }
-    return 1;
+    // 2) Else check if 't'
+    if (str[0] == 't') {
+        int i = 1;
+        if (str[i] == '_') i++;
+        if (!str[i]) return 0;
+        for (; str[i]; i++) {
+            if (str[i] < '0' || str[i] > '9') return 0;
+        }
+        return 1; // int
+    }
+    return 0;
 }
 
 // Return the binding for a tempName, or NULL if not found
@@ -113,35 +126,67 @@ static void allocateBinding(const char* tempName) {
         exit(1);
     }
 
-    g_tempBindings[g_numTempBindings].tempName = strdup(tempName);
+    // Create a new binding struct
+    g_tempBindings[g_numTempBindings].tempName   = strdup(tempName);
     g_tempBindings[g_numTempBindings].assignedReg = NULL;
-    g_tempBindings[g_numTempBindings].spilled = 0;
+    g_tempBindings[g_numTempBindings].spilled    = 0;
 
-    // If we still have free regs, assign one
-    if (g_nextRegIndex < MAX_REGS) {
-        // Assign $t<g_nextRegIndex>
-        static char regNameBuf[8];
-        sprintf(regNameBuf, "$t%d", g_nextRegIndex);
-        g_tempBindings[g_numTempBindings].assignedReg = strdup(regNameBuf);
-        g_tempBindings[g_numTempBindings].spilled = 0;
-        g_nextRegIndex++;
+    // Detect if int or float
+    int type = isTempName(tempName);  // from the unified function above
+    //   or if you used separate isTempName/isFloatTempName, do:
+    //   if (isFloatTempName(tempName)) { ... } else if (isTempName(tempName)) { ... }
 
-        fprintf(stderr, "DEBUG: Assigned %s to register %s\n", tempName, regNameBuf);
-    } else {
-        // Spill
-        g_tempBindings[g_numTempBindings].assignedReg = NULL;
-        g_tempBindings[g_numTempBindings].spilled = 1;
+    if (type == 2) {
+        // This is a float temp => try to assign $fX
+        if (g_nextFloatRegIndex < MAX_FLOAT_REGS) {
+            // e.g. assign $f0, $f1, ...
+            static char regNameBuf[8];
+            sprintf(regNameBuf, "$f%d", g_nextFloatRegIndex);
+            g_tempBindings[g_numTempBindings].assignedReg = strdup(regNameBuf);
+            g_tempBindings[g_numTempBindings].spilled     = 0;
+            g_nextFloatRegIndex++;
 
-        // Mark that we need "var_t_X" in .data
-        char labelBuf[64];
-        sprintf(labelBuf, "var_%s", tempName);
-        addGlobalName(labelBuf);
+            fprintf(stderr, "DEBUG: Assigned %s to float reg %s\n", tempName, regNameBuf);
+        } else {
+            // Spill float
+            g_tempBindings[g_numTempBindings].assignedReg = NULL;
+            g_tempBindings[g_numTempBindings].spilled     = 1;
+            char labelBuf[64];
+            sprintf(labelBuf, "var_%s", tempName);
+            addGlobalName(labelBuf);
+            fprintf(stderr, "DEBUG: Spilled float %s to memory as %s\n", tempName, labelBuf);
+        }
+    } 
+    else if (type == 1) {
+        // This is an int temp => same logic as before
+        if (g_nextRegIndex < MAX_REGS) {
+            static char regNameBuf[8];
+            sprintf(regNameBuf, "$t%d", g_nextRegIndex);
+            g_tempBindings[g_numTempBindings].assignedReg = strdup(regNameBuf);
+            g_tempBindings[g_numTempBindings].spilled     = 0;
+            g_nextRegIndex++;
 
-        fprintf(stderr, "DEBUG: Spilled %s to memory as %s\n", tempName, labelBuf);
+            fprintf(stderr, "DEBUG: Assigned %s to int reg %s\n", tempName, regNameBuf);
+        } else {
+            // Spill int
+            g_tempBindings[g_numTempBindings].assignedReg = NULL;
+            g_tempBindings[g_numTempBindings].spilled     = 1;
+            char labelBuf[64];
+            sprintf(labelBuf, "var_%s", tempName);
+            addGlobalName(labelBuf);
+
+            fprintf(stderr, "DEBUG: Spilled int %s to memory as %s\n", tempName, labelBuf);
+        }
+    } 
+    else {
+        // If it's neither t_# nor ft_# => do something fallback or error
+        // But presumably it won't get here if you only call allocateBinding for recognized temps
+        fprintf(stderr, "[ERROR] allocateBinding called with unknown tempName: %s\n", tempName);
     }
 
     g_numTempBindings++;
 }
+
 
 // Return the register if the temp is in a register, or NULL if spilled
 static const char* getRegIfAny(const char* tempName) {
@@ -665,6 +710,166 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             loadArg(c->arg1, "$s0", out);             // Load arg1 into $s0
             storeResult(c->result, "$s0", out);      // Store from $s0 to result
         }
+        else if (!strcmp(op, "f=")) {
+            // result = arg1, but both are float
+            loadFloatArg(c->arg1, "$f0", out);     // load the float source into $f0
+            storeFloatResult(c->result, "$f0", out); // store into result
+        }
+
+        else if (!strcmp(op, "f+") || !strcmp(op, "f-") ||
+         !strcmp(op, "f*") || !strcmp(op, "f/") ||
+         !strcmp(op, "f==") || !strcmp(op, "f!=") ||
+         !strcmp(op, "f<") || !strcmp(op, "f<=") ||
+         !strcmp(op, "f>") || !strcmp(op, "f>="))
+        {
+            // 1) Load float arguments into registers, e.g. $f0 and $f1
+            loadFloatArg(c->arg1, "$f0", out);
+            loadFloatArg(c->arg2, "$f1", out);
+
+            // 2) If it's one of the arithmetic ops (f+, f-, f*, f/), do add.s etc.
+            if (!strcmp(op, "f+")) {
+                fprintf(out, "    add.s $f2, $f0, $f1\n");
+                storeFloatResult(c->result, "$f2", out);
+            }
+            else if (!strcmp(op, "f-")) {
+                fprintf(out, "    sub.s $f2, $f0, $f1\n");
+                storeFloatResult(c->result, "$f2", out);
+            }
+            else if (!strcmp(op, "f*")) {
+                fprintf(out, "    mul.s $f2, $f0, $f1\n");
+                storeFloatResult(c->result, "$f2", out);
+            }
+            else if (!strcmp(op, "f/")) {
+                fprintf(out, "    div.s $f2, $f0, $f1\n");
+                storeFloatResult(c->result, "$f2", out);
+            }
+            else {
+                // 3) If it's a comparison (f==, f<, etc.), use MIPS float compares
+                //    e.g., c.eq.s, c.lt.s, c.le.s, etc. plus bc1t / bc1f.
+                //    Then store 1 or 0 in an integer register to place in the result.
+                // Example: f== => c.eq.s $f0, $f1
+                // Then use bc1t / bc1f to set $t9 accordingly.
+                
+                if (!strcmp(op, "f==")) {
+                    // We'll do something like:
+                    // c.eq.s $f0, $f1
+                    // bc1t label_true
+                    // li $t9, 0
+                    // j label_end
+                    // label_true:
+                    // li $t9, 1
+                    // label_end:
+                    // storeResult(...)
+                    
+                    char label_true[64], label_end[64];
+                    sprintf(label_true, "L_feq_true_%d", labelCounter++);
+                    sprintf(label_end,  "L_feq_end_%d",  labelCounter++);
+
+                    // Compare
+                    fprintf(out, "    c.eq.s $f0, $f1\n");
+                    // Branch if c1 condition is true
+                    fprintf(out, "    bc1t %s\n", label_true);
+                    // Else false
+                    fprintf(out, "    li $t9, 0\n");
+                    fprintf(out, "    j %s\n", label_end);
+                    fprintf(out, "%s:\n", label_true);
+                    fprintf(out, "    li $t9, 1\n");
+                    fprintf(out, "%s:\n", label_end);
+
+                    // store $t9 in the result
+                    storeResult(c->result, "$t9", out);
+                }
+                else if (!strcmp(op, "f!=")) {
+                    // c.eq.s => bc1t => means equal => so if bc1t => eq => we want not eq => do inverse logic
+                    char label_true[64], label_end[64];
+                    sprintf(label_true, "L_fneq_true_%d", labelCounter++);
+                    sprintf(label_end,  "L_fneq_end_%d",  labelCounter++);
+
+                    fprintf(out, "    c.eq.s $f0, $f1\n");
+                    // If they're equal => c1 is set => we skip => so if bc1t => they're equal => not !=
+                    fprintf(out, "    bc1t %s\n", label_true);
+                    // If we didn't branch => they're not equal => set 1
+                    fprintf(out, "    li $t9, 1\n");
+                    // Jump to end
+                    fprintf(out, "    j %s\n", label_end);
+                    // If bc1t => eq => then 0
+                    fprintf(out, "%s:\n", label_true);
+                    fprintf(out, "    li $t9, 0\n");
+                    fprintf(out, "%s:\n", label_end);
+
+                    storeResult(c->result, "$t9", out);
+                }
+                else if (!strcmp(op, "f<")) {
+                    // c.lt.s => bc1t => means $f0 < $f1
+                    char label_true[64], label_end[64];
+                    sprintf(label_true, "L_flt_true_%d", labelCounter++);
+                    sprintf(label_end,  "L_flt_end_%d",  labelCounter++);
+
+                    fprintf(out, "    c.lt.s $f0, $f1\n");
+                    fprintf(out, "    bc1t %s\n", label_true);
+                    // else
+                    fprintf(out, "    li $t9, 0\n");
+                    fprintf(out, "    j %s\n", label_end);
+                    fprintf(out, "%s:\n", label_true);
+                    fprintf(out, "    li $t9, 1\n");
+                    fprintf(out, "%s:\n", label_end);
+
+                    storeResult(c->result, "$t9", out);
+                }
+                else if (!strcmp(op, "f<=")) {
+                    // c.le.s => bc1t => means $f0 <= $f1
+                    // Similar pattern
+                    char label_true[64], label_end[64];
+                    sprintf(label_true, "L_fle_true_%d", labelCounter++);
+                    sprintf(label_end,  "L_fle_end_%d",  labelCounter++);
+
+                    fprintf(out, "    c.le.s $f0, $f1\n");
+                    fprintf(out, "    bc1t %s\n", label_true);
+                    fprintf(out, "    li $t9, 0\n");
+                    fprintf(out, "    j %s\n", label_end);
+                    fprintf(out, "%s:\n", label_true);
+                    fprintf(out, "    li $t9, 1\n");
+                    fprintf(out, "%s:\n", label_end);
+
+                    storeResult(c->result, "$t9", out);
+                }
+                else if (!strcmp(op, "f>")) {
+                    // "f>" => c.lt.s $f1, $f0
+                    // or c.le.s and invert, etc.
+                    char label_true[64], label_end[64];
+                    sprintf(label_true, "L_fgt_true_%d", labelCounter++);
+                    sprintf(label_end,  "L_fgt_end_%d",  labelCounter++);
+
+                    // We'll do c.lt.s $f1, $f0 => bc1t => means $f1 < $f0 => so $f0 > $f1
+                    fprintf(out, "    c.lt.s $f1, $f0\n");
+                    fprintf(out, "    bc1t %s\n", label_true);
+                    fprintf(out, "    li $t9, 0\n");
+                    fprintf(out, "    j %s\n", label_end);
+                    fprintf(out, "%s:\n", label_true);
+                    fprintf(out, "    li $t9, 1\n");
+                    fprintf(out, "%s:\n", label_end);
+
+                    storeResult(c->result, "$t9", out);
+                }
+                else if (!strcmp(op, "f>=")) {
+                    // "f>=" => c.le.s $f1, $f0
+                    char label_true[64], label_end[64];
+                    sprintf(label_true, "L_fge_true_%d", labelCounter++);
+                    sprintf(label_end,  "L_fge_end_%d",  labelCounter++);
+
+                    fprintf(out, "    c.le.s $f1, $f0\n");
+                    fprintf(out, "    bc1t %s\n", label_true);
+                    fprintf(out, "    li $t9, 0\n");
+                    fprintf(out, "    j %s\n", label_end);
+                    fprintf(out, "%s:\n", label_true);
+                    fprintf(out, "    li $t9, 1\n");
+                    fprintf(out, "%s:\n", label_end);
+
+                    storeResult(c->result, "$t9", out);
+                }
+            }
+        }
+
         else if (!strcmp(op, "+") || !strcmp(op, "-") ||
                  !strcmp(op, "*") || !strcmp(op, "/") ||
                  !strcmp(op, "==") || !strcmp(op, "!=") ||

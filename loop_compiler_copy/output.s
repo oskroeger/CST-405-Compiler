@@ -25,16 +25,17 @@ var_t_35: .word 0
 var_t_34: .word 0
 var_a: .word 0
 var_b: .word 0
-var_f_0: .word 0
 var_p: .word 0
-var_f_1: .word 0
 var_q: .word 0
-var_pq: .word 0
+var_f_3: .word 0
+var_f_4: .word 0
+var_f_2: .word 0
 var_x: .word 0
 var_y: .word 0
 var_z: .word 0
 var_d: .word 0
 var_e: .word 0
+var_pq: .word 0
 var_arr: .word 0, 0, 0, 0, 0
 
 .text
@@ -81,21 +82,32 @@ endfunc_sub:
     addi $sp, $sp, 8
     jr $ra
 main:
-    lw $s0, var_1.100000
-    sw $s0, var_f_0
-    lw $s0, var_f_0
-    sw $s0, var_p
-    lw $s0, var_2.300000
-    sw $s0, var_f_1
-    lw $s0, var_f_1
-    sw $s0, var_q
+.data
+LC_flt_0: .float 1.100000
+.text
+    la $t0, LC_flt_0
+    l.s $f0, 0($t0)
+    s.s $f0, var_f_0
+    l.s $f0, var_f_0
+    s.s $f0, var_p
+.data
+LC_flt_1: .float 2.300000
+.text
+    la $t0, LC_flt_1
+    l.s $f0, 0($t0)
+    s.s $f0, var_f_1
+    l.s $f0, var_f_1
+    s.s $f0, var_q
     lw $s0, var_p
     sw $s0, var_f_3
     lw $s0, var_q
     sw $s0, var_f_4
-    # Unhandled TAC: f+ f_3 f_4 f_2
-    lw $s0, var_f_2
-    sw $s0, var_pq
+    l.s $f0, var_f_3
+    l.s $f1, var_f_4
+    add.s $f2, $f0, $f1
+    s.s $f2, var_f_2
+    l.s $f0, var_f_2
+    s.s $f0, var_pq
     li $s0, 4
     move $t6, $s0
     move $s0, $t6

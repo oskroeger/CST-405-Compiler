@@ -247,6 +247,19 @@ Symbol* lookupSymbol(SymbolTable* table, char* name) {
     return NULL;
 }
 
+SymbolType lookupTypeInSymbolTable(SymbolTable* table, const char* name) {
+    if (!table || !name) {
+        return TYPE_UNKNOWN;
+    }
+
+    // We call lookupSymbol to see if there's a symbol with this name
+    Symbol* sym = lookupSymbol(table, (char*)name);
+    if (!sym) {
+        return TYPE_UNKNOWN;
+    }
+    return sym->type;
+}
+
 // Function to free the symbol table and its symbols
 void freeSymbolTable(SymbolTable* table) {
     for (int i = 0; i < table->size; i++) {

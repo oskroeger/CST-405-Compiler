@@ -83,8 +83,20 @@ TAC* generateTAC(ASTNode* node, char* target) {
                 code = appendTAC(code, createTAC("store", rhsTemp, indexTemp, node->assignStmt.varName));
             } else {
                 char* rhsTarget = target ? strdup(target) : newTemp(node->assignStmt.expr->dataType);
-                code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTarget));
-                code = appendTAC(code, createTAC("=", rhsTarget, NULL, node->assignStmt.varName));
+
+                // Check if the LHS is a float
+                DataType lhsType = lookupTypeInSymbolTable(currentScope, node->assignStmt.varName);
+
+                if (lhsType == TYPE_INT) {
+                    code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTarget));
+                    code = appendTAC(code, createTAC("=", rhsTarget, NULL, node->assignStmt.varName));
+                }
+                else if (lhsType == TYPE_FLOAT) {
+                    code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTarget));
+                    code = appendTAC(code, createTAC("f=", rhsTarget, NULL, node->assignStmt.varName));
+                }
+
+                
             }
             break;
         }
@@ -97,7 +109,14 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
             char* resultTemp = target ? target : newTemp(node->expr.left->dataType);
             code = appendTAC(code, createTAC(node->expr.operator, lhsTemp, rhsTemp, resultTemp));
-            printf ("[INFO] Generated TAC for expression: %s = %s %s %s\n", resultTemp, lhsTemp, node->expr.operator, rhsTemp);
+
+            // check if it s a float operation
+            if (node->expr.left->dataType == TYPE_F || node->expr.right->dataType == TYPE_F) {
+                printf ("[INFO] Generated TAC for expression: %s f= %s %s %s\n", resultTemp, lhsTemp, node->expr.operator, rhsTemp);
+
+            } else {
+                printf ("[INFO] Generated TAC for expression: %s = %s %s %s\n", resultTemp, lhsTemp, node->expr.operator, rhsTemp);
+            }
             break;
         }
 
@@ -113,12 +132,12 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
         case NodeType_FloatExpr: {
             char* resultTemp = target ? target : newTemp(TYPE_F);
-            TAC* instr = createTAC("=", NULL, NULL, resultTemp);
+            TAC* instr = createTAC("f=", NULL, NULL, resultTemp);
             instr->arg1 = (char*)malloc(20);
             sprintf(instr->arg1, "%f", node->FloatExpr.floatNum);
             code = appendTAC(code, instr);
 
-            printf ("[INFO] Generated TAC for float expression: %s = %f\n", resultTemp, node->FloatExpr.floatNum);
+            printf ("[INFO] Generated TAC for float expression: %s f= %f\n", resultTemp, node->FloatExpr.floatNum);
             break;
         }
 
@@ -242,8 +261,11 @@ TAC* generateTAC(ASTNode* node, char* target) {
 void printTAC(TAC* tac) {
     TAC* current = tac;
     while (current) {
+
         if (current->operator && strcmp(current->operator, "=") == 0) {
             printf("%s = %s\n", current->result, current->arg1);
+        } else if (current->operator && strcmp(current->operator, "f=") == 0) {
+            printf("%s f= %s\n", current->result, current->arg1);
         } else if (current->operator && 
                   (strcmp(current->operator, "+") == 0 ||
                    strcmp(current->operator, "-") == 0 ||
@@ -275,10 +297,13 @@ void printTAC(TAC* tac) {
         } else if (current->operator && strcmp(current->operator, "write") == 0) {
             printf("write %s\n", current->arg1);
         } else if (current->operator && strcmp(current->operator, "load") == 0) {
+            // detemine if its = or f=  based on the type of the result
+            char* equals = (lookupTypeInSymbolTable(currentScope, current->arg1) == TYPE_FLOAT) ? "f=" : "=";
+
             if (current->arg2) {
-                printf("%s = load %s[%s]\n", current->result, current->arg1, current->arg2);
+                printf("%s %s load %s[%s]\n", current->result, equals, current->arg1, current->arg2);
             } else {
-                printf("%s = load %s\n", current->result, current->arg1);
+                printf("%s %s load %s\n", current->result, equals, current->arg1);
             }
         } else if (current->operator && strcmp(current->operator, "if") == 0) {
             printf("if %s goto %s\n", current->arg1, current->result);
