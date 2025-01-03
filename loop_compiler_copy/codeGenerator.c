@@ -1041,27 +1041,51 @@ void generateMIPSFromTAC(TAC* tacHead, const char* outputFilename) {
             }
         }
         
-        else if (!strcmp(op, "store")) {
-
+       else if (!strcmp(op, "store")) {
             // store arg1 into result[arg2]
-            // 1. Load base address of array into $s7
-            loadArg(c->result, "$s7", out);             // Load base address into $s7
+            // That means: array[result], store arg1 at index arg2
 
-            // 2. Load index into $s0
+            // 1) Load base address of array into $s7
+            loadArg(c->result, "$s7", out); // 'result' is the array name
+
+            // 2) Load index into $s0
             loadArg(c->arg2, "$s0", out);
 
-            // 3. Multiply index by 4: sll $t0, $s0, 2
+            // 3) Multiply index by 4: sll $t0, $s0, 2
             fprintf(out, "    sll $t0, $s0, 2\n");
 
-            // 4. Add base address to get effective address: add $t0, $s7, $t0
+            // 4) Add base address to get effective address: add $t0, $s7, $t0
             fprintf(out, "    add $t0, $s7, $t0\n");
 
-            // 5. Load value to store into $s1
-            loadArg(c->arg1, "$s1", out);
+            // 5) Check if arg1 is float or int
+            int isFloat = 0;
+            if (isTempName(c->arg1) == 2) {
+                isFloat = 1;
+            } else {
+                // If a user-defined variable, check symbol table
+                SymbolType st = lookupTypeInSymbolTable(currentScope, c->arg1);
+                if (st == TYPE_FLOAT) {
+                    isFloat = 1;
+                }
+            }
 
-            // 6. Store word into address: sw $s1, 0($t0)
-            fprintf(out, "    sw %s, 0($t0)\n", "$s1");
+            // 6) Based on isFloat, do loadFloatArg + s.s, or loadArg + sw
+            if (isFloat) {
+                // 6a) Load the float value into $f0
+                loadFloatArg(c->arg1, "$f0", out);
+
+                // 6b) Store word into address: s.s $f0, 0($t0)
+                fprintf(out, "    s.s %s, 0($t0)\n", "$f0");
+            } else {
+                // integer store
+                // 6a) loadArg => put the integer value into $s1
+                loadArg(c->arg1, "$s1", out);
+
+                // 6b) store word: sw $s1, 0($t0)
+                fprintf(out, "    sw %s, 0($t0)\n", "$s1");
+            }
         }
+
         else if (!strcmp(op, "ifFalse")) {
             // ifFalse cond goto label
             // chekc if the condition is a float
