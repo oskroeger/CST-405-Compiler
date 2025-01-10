@@ -36,7 +36,6 @@ SymbolTable* createSymbolTable(SymbolTable* parent, int size) {
     return newTable;
 }
 
-
 // Hash function to map a name to an index
 unsigned int hash(SymbolTable* table, char* name) {
     unsigned int hashval = 0;
@@ -70,7 +69,6 @@ void registerScope(SymbolTable* scope) {
     }
 }
 
-
 void enterScope() {
     SymbolTable* newScope = createSymbolTable(currentScope, TABLE_SIZE);
     if (newScope == NULL || newScope->table == NULL) {
@@ -87,8 +85,6 @@ void enterScope() {
     }
 }
 
-
-
 // Function to exit the current scope
 void exitScope() {
     if (currentScope) {
@@ -99,7 +95,6 @@ void exitScope() {
         fprintf(stderr, "No scope to exit.\n");
     }
 }
-
 
 // Function to add a symbol to the table (for regular variables)
 void addSymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue value) {
@@ -135,6 +130,7 @@ void addSymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue valu
     newSymbol->name = strdup(name);
     newSymbol->type = type;
     newSymbol->size = 0;  // Default size for non-array symbols
+    newSymbol->isParameter = 0; // Regular variable
 
     if (type == TYPE_INT) {
         newSymbol->value.intValue = value.intValue;
@@ -188,6 +184,7 @@ void addArraySymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue
         }
     }
 
+    newSymbol->isParameter = 0; // Regular array variable
     newSymbol->next = table->table[hashval];
     table->table[hashval] = newSymbol;
 }
@@ -215,12 +212,55 @@ void addFunctionSymbol(SymbolTable* table, char* name) {
     newSymbol->size = 0;
 
     memset(&(newSymbol->value), 0, sizeof(SymbolValue));
+    newSymbol->isParameter = 0; // Function symbol is not a parameter
 
     newSymbol->next = table->table[hashval];
     table->table[hashval] = newSymbol;
 }
 
-// Enhanced function to look up a name in the table, checking parent scopes if needed
+// New function to add parameter symbols
+void addParameterSymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue value) {
+    if (table == NULL || table->table == NULL) {
+        fprintf(stderr, "Symbol table or table array not initialized\n");
+        return;
+    }
+
+    unsigned int hashval = hash(table, name);
+
+    // Check for an existing symbol with the same name in the current scope
+    for (Symbol* sym = table->table[hashval]; sym != NULL; sym = sym->next) {
+        if (strcmp(name, sym->name) == 0) {
+            // Update existing symbol's type and value, set isParameter
+            sym->type = type;
+            sym->isParameter = 1;
+            if (type == TYPE_INT) {
+                sym->value.intValue = value.intValue;
+            } else if (type == TYPE_FLOAT) {
+                sym->value.floatValue = value.floatValue;
+            }
+            return;
+        }
+    }
+
+    // If no existing symbol found, add a new symbol
+    Symbol* newSymbol = (Symbol*)malloc(sizeof(Symbol));
+    if (!newSymbol) return;
+
+    newSymbol->name = strdup(name);
+    newSymbol->type = type;
+    newSymbol->size = 0;  // Default size for non-array symbols
+    newSymbol->isParameter = 1; // Mark as parameter
+
+    if (type == TYPE_INT) {
+        newSymbol->value.intValue = value.intValue;
+    } else if (type == TYPE_FLOAT) {
+        newSymbol->value.floatValue = value.floatValue;
+    }
+
+    newSymbol->next = table->table[hashval];
+    table->table[hashval] = newSymbol;
+}
+
 Symbol* lookupSymbol(SymbolTable* table, char* name) {
     if (table == NULL || name == NULL) {
         fprintf(stderr, "[ERROR] lookupSymbol called with NULL arguments.\n");
@@ -247,7 +287,6 @@ Symbol* lookupSymbol(SymbolTable* table, char* name) {
     return NULL;
 }
 
-
 // Function to free the symbol table and its symbols
 void freeSymbolTable(SymbolTable* table) {
     for (int i = 0; i < table->size; i++) {
@@ -269,7 +308,6 @@ void freeSymbolTable(SymbolTable* table) {
     free(table->table);
     free(table);
 }
-
 
 // Enhanced function to print the symbol table for debugging using ScopeNode list
 void printSymbolTable(const ScopeNode* scopeListHead) {
@@ -354,13 +392,16 @@ void printSymbolTable(const ScopeNode* scopeListHead) {
                 } else { // Regular variable
                     switch (sym->type) {
                         case TYPE_INT:
-                            printf("Name: %s | Type: INT | Value: %d\n", sym->name, sym->value.intValue);
+                            printf("Name: %s | Type: INT | Value: %d | %s\n", 
+                                   sym->name, sym->value.intValue, sym->isParameter ? "(Parameter)" : "");
                             break;
                         case TYPE_FLOAT:
-                            printf("Name: %s | Type: FLOAT | Value: %.4f\n", sym->name, sym->value.floatValue);
+                            printf("Name: %s | Type: FLOAT | Value: %.4f | %s\n", 
+                                   sym->name, sym->value.floatValue, sym->isParameter ? "(Parameter)" : "");
                             break;
                         case TYPE_CHAR:
-                            printf("Name: %s | Type: CHAR | Value: %c\n", sym->name, sym->value.charValue);
+                            printf("Name: %s | Type: CHAR | Value: %c | %s\n", 
+                                   sym->name, sym->value.charValue, sym->isParameter ? "(Parameter)" : "");
                             break;
                         default:
                             printf("Name: %s | Type: UNKNOWN\n", sym->name);
@@ -385,7 +426,6 @@ void printSymbolTable(const ScopeNode* scopeListHead) {
 
     printf("\n------------------------\n");
 }
-
 
 // Helper function to convert SymbolType to a string
 const char* symbolTypeToString(SymbolType type) {

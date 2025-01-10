@@ -3,13 +3,90 @@
 #include <stdio.h>
 #include <string.h>
 
-// A helper function to generate unique temporary names.
-static int tempCounter = 0;
-static char* newTemp() {
+// ----------------------------------------------------------------------------
+// 1) Separate counters for int temps (t_0, t_1, ...) and float temps (f_0, f_1, ...)
+// ----------------------------------------------------------------------------
+static int intTempCounter = 0;
+static int floatTempCounter = 0;
+
+// Generate a fresh int temp: t_0, t_1, ...
+static char* newIntTemp(void) {
     char* buffer = (char*)malloc(20);
-    sprintf(buffer, "t%d", tempCounter++);
+    sprintf(buffer, "t_%d", intTempCounter++);
     return buffer;
 }
+
+// Generate a fresh float temp: f_0, f_1, ...
+static char* newFloatTemp(void) {
+    char* buffer = (char*)malloc(20);
+    sprintf(buffer, "f_%d", floatTempCounter++);
+    return buffer;
+}
+
+// A small helper that picks t_ or f_ depending on DataType
+static char* newTempByType(DataType dt) {
+    return (dt == DataType_Float) ? newFloatTemp() : newIntTemp();
+}
+
+// ----------------------------------------------------------------------------
+// 2) A helper function to figure out if a node or expression is int or float.
+//    This is the core of deciding which register type to use.
+// ----------------------------------------------------------------------------
+static DataType getASTNodeDataType(ASTNode* node) {
+    if (!node) {
+        // Default fallback
+        return DataType_Int;
+    }
+
+    switch (node->type) {
+        case NodeType_IntExpr:
+            return DataType_Int;
+
+        case NodeType_FloatExpr:
+            return DataType_Float;
+
+        // For a binary Expression node, if either side is float => float
+        case NodeType_Expr: {
+            DataType leftType  = getASTNodeDataType(node->expr.left);
+            DataType rightType = getASTNodeDataType(node->expr.right);
+            if (leftType == DataType_Float || rightType == DataType_Float) {
+                return DataType_Float;
+            } else {
+                return DataType_Int;
+            }
+        }
+
+        // For a simple ID, array access, etc., you may want to rely on
+        // a symbol table or some annotation.  For simplicity, if you've
+        // annotated your AST so that a float variable is known to be NodeType_FloatExpr,
+        // then you could do a simpler check.  Otherwise, you can default to int
+        // or do a symbol-table lookup here if you have that data. For now:
+        case NodeType_SimpleID:
+        case NodeType_ArrayAccess:
+        case NodeType_AssignStmt:
+        case NodeType_FunctionCall:
+        {
+            // If in your compiler you have a proper type-check pass, 
+            // you'd do a lookup here. 
+            // For minimal changes, let's say "expressions are determined by their children",
+            // so if we can't figure it out, default to int (or do something else).
+            return DataType_Int;
+        }
+
+        // You can add more logic for arrays, if statements, etc. 
+        // Typically, conditions are booleans, but we’re ignoring that
+        // for now since your code is all typed as int/float.
+
+        default:
+            return DataType_Int;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// The rest of the TAC logic remains almost identical to your original code.
+// We only replaced (char* target ? target : newTemp()) with newTempByType(...)
+// based on the node's data type where appropriate.
+// ----------------------------------------------------------------------------
 
 // Helper to create a TAC node
 TAC* createTAC(char* operator, char* arg1, char* arg2, char* result) {
@@ -69,33 +146,63 @@ TAC* generateTAC(ASTNode* node, char* target) {
             break;
 
         case NodeType_AssignStmt: {
+            /*
+             * We'll assume the type of the final assigned expression
+             * dictates which register we need for the RHS. 
+             * (If you have a symbol table to check varName’s type, you could do that, too.)
+             */
+            DataType rhsType = getASTNodeDataType(node->assignStmt.expr);
+
             if (node->assignStmt.isArray) {
-                char* indexTemp = newTemp();
+                // Generate code for array index in an int register (most likely).
+                // If your language only allows int indexes, that’s easy:
+                char* indexTemp = newIntTemp(); 
                 code = appendTAC(code, generateTAC(node->assignStmt.arrayIndex, indexTemp));
-                char* rhsTemp = newTemp();
+
+                // Generate code for the RHS (could be float or int)
+                char* rhsTemp = newTempByType(rhsType);
                 code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTemp));
+
+                // store <rhsTemp>, var[indexTemp]
                 code = appendTAC(code, createTAC("store", rhsTemp, indexTemp, node->assignStmt.varName));
             } else {
-                char* rhsTarget = target ? strdup(target) : newTemp();
-                code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTarget));
-                code = appendTAC(code, createTAC("=", rhsTarget, NULL, node->assignStmt.varName));
+                // If no array, just assign:
+                char* rhsTemp = target ? strdup(target) : newTempByType(rhsType);
+                code = appendTAC(code, generateTAC(node->assignStmt.expr, rhsTemp));
+
+                // varName = <rhsTemp>
+                code = appendTAC(code, createTAC("=", rhsTemp, NULL, node->assignStmt.varName));
             }
             break;
         }
 
         case NodeType_Expr: {
-            char* lhsTemp = newTemp();
-            char* rhsTemp = newTemp();
+            /*
+             * For a binary expression (+, -, *, /, etc.), figure out if it’s int or float:
+             */
+            DataType exprType = getASTNodeDataType(node);
+
+            // Generate code for left side
+            DataType leftType = getASTNodeDataType(node->expr.left);
+            char* lhsTemp = newTempByType(leftType);
             code = appendTAC(code, generateTAC(node->expr.left, lhsTemp));
+
+            // Generate code for right side
+            DataType rightType = getASTNodeDataType(node->expr.right);
+            char* rhsTemp = newTempByType(rightType);
             code = appendTAC(code, generateTAC(node->expr.right, rhsTemp));
 
-            char* resultTemp = target ? target : newTemp();
+            // The result register type is determined by exprType
+            char* resultTemp = target ? target : newTempByType(exprType);
+
+            // e.g. result = lhs + rhs
             code = appendTAC(code, createTAC(node->expr.operator, lhsTemp, rhsTemp, resultTemp));
             break;
         }
 
         case NodeType_IntExpr: {
-            char* resultTemp = target ? target : newTemp();
+            // Force an int register
+            char* resultTemp = target ? target : newTempByType(DataType_Int);
             TAC* instr = createTAC("=", NULL, NULL, resultTemp);
             instr->arg1 = (char*)malloc(20);
             sprintf(instr->arg1, "%d", node->IntExpr.integer);
@@ -104,7 +211,8 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_FloatExpr: {
-            char* resultTemp = target ? target : newTemp();
+            // Force a float register
+            char* resultTemp = target ? target : newTempByType(DataType_Float);
             TAC* instr = createTAC("=", NULL, NULL, resultTemp);
             instr->arg1 = (char*)malloc(20);
             sprintf(instr->arg1, "%f", node->FloatExpr.floatNum);
@@ -113,15 +221,27 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_SimpleID: {
-            char* resultTemp = target ? target : newTemp();
+            /*
+             * If you have a type system, you'd figure out if this ID is int or float.
+             * For the example, we'll assume it's int (or default). 
+             * If you have a symbol table that knows 'y' is float, you might do newFloatTemp().
+             */
+            DataType idType = DataType_Int; 
+            char* resultTemp = target ? target : newTempByType(idType);
             code = appendTAC(code, createTAC("load", node->simpleID.name, NULL, resultTemp));
             break;
         }
 
         case NodeType_ArrayAccess: {
-            char* indexTemp = newTemp();
+            /*
+             * Similarly, to properly handle float arrays, do a symbol-table lookup here.
+             * For now, treat arrays as int by default. 
+             */
+            DataType arrType = DataType_Int;
+            char* indexTemp = newTempByType(DataType_Int);
             code = appendTAC(code, generateTAC(node->arrayAccess.index, indexTemp));
-            char* resultTemp = target ? target : newTemp();
+
+            char* resultTemp = target ? target : newTempByType(arrType);
             code = appendTAC(code, createTAC("load", node->arrayAccess.arrayName, indexTemp, resultTemp));
             break;
         }
@@ -131,7 +251,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
             break;
 
         case NodeType_IfStmt: {
-            char* condTemp = newTemp();
+            char* condTemp = newIntTemp(); // Condition often is int (0 or 1)
             code = appendTAC(code, generateTAC(node->ifStmt.condition, condTemp));
 
             char* labelThen = strdup("L_then");
@@ -149,7 +269,8 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_ReturnStmt: {
-            char* retTemp = newTemp();
+            // Our assumption: functions only return int
+            char* retTemp = newIntTemp();
             code = appendTAC(code, generateTAC(node->returnStmt.expr, retTemp));
             code = appendTAC(code, createTAC("return", retTemp, NULL, NULL));
             break;
@@ -166,57 +287,53 @@ TAC* generateTAC(ASTNode* node, char* target) {
             break;
 
         case NodeType_FunctionCall: {
-            // Generate args
+            // Generate code for each argument
             TAC* argCode = NULL;
             ASTNode* argList = node->functionCall.args;
-            int argCount=0;
+            int argCount = 0;
+
             while (argList && argList->type == NodeType_StmtList) {
                 ASTNode* singleArg = argList->stmtList.stmt;
-                char* argTemp = newTemp();
+
+                // Determine if argument is int or float
+                DataType argType = getASTNodeDataType(singleArg);
+                char* argTemp = newTempByType(argType);
+
                 argCode = appendTAC(argCode, generateTAC(singleArg, argTemp));
-                // param argTemp
+                // param <argTemp>
                 argCode = appendTAC(argCode, createTAC("param", argTemp, NULL, NULL));
+
                 argList = argList->stmtList.stmtList;
                 argCount++;
             }
             code = appendTAC(code, argCode);
 
-            // If function returns a value in expressions, store in target
+            // If function returns a value and we care about it, store in target
+            // We assume function returns int only (per your requirement).
             char* resultTemp = target ? target : NULL; 
-            // If resultTemp is NULL, means we don't need the return value
             code = appendTAC(code, createTAC("call", node->functionCall.name, NULL, resultTemp));
-
             break;
         }
-        case NodeType_WhileStmt: {
-            // Create meaningful labels for the start and end of the loop
-            char* startLabel = (char*)malloc(20);
-            char* endLabel = (char*)malloc(20);
-            sprintf(startLabel, "L_while_start_%d", tempCounter++);
-            sprintf(endLabel, "L_while_end_%d", tempCounter++);
 
-            // Add a label for the start of the loop
+        case NodeType_WhileStmt: {
+            char* startLabel = (char*)malloc(20);
+            char* endLabel   = (char*)malloc(20);
+            sprintf(startLabel, "L_while_start_%d", intTempCounter++);
+            sprintf(endLabel,   "L_while_end_%d",   intTempCounter++);
+
             code = appendTAC(code, createTAC("label", NULL, NULL, startLabel));
 
-            // Generate TAC for the loop condition
-            char* condTemp = newTemp();
+            // Condition typically in an int register
+            char* condTemp = newIntTemp();
             code = appendTAC(code, generateTAC(node->whileStmt.condition, condTemp));
 
-            // Add a conditional jump to the end of the loop if the condition is false
             code = appendTAC(code, createTAC("ifFalse", condTemp, NULL, endLabel));
-
-            // Generate TAC for the loop body
             TAC* bodyCode = generateTAC(node->whileStmt.body, NULL);
             if (bodyCode) {
                 code = appendTAC(code, bodyCode);
             }
-
-            // Add an unconditional jump back to the start of the loop
             code = appendTAC(code, createTAC("goto", NULL, NULL, startLabel));
-
-            // Add a label for the end of the loop
             code = appendTAC(code, createTAC("label", NULL, NULL, endLabel));
-
             break;
         }
 
@@ -227,7 +344,6 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
     return code;
 }
-
 
 void printTAC(TAC* tac) {
     TAC* current = tac;

@@ -179,12 +179,14 @@ FunctionHeader:
                     st = TYPE_FLOAT;
                     value.floatValue = FLT_MIN;
                 }
-                addSymbol(currentScope, singleParam->varDecl.varName, st, value);
+                // Use addParameterSymbol instead of addSymbol
+                addParameterSymbol(currentScope, singleParam->varDecl.varName, st, value);
             }
             paramNode = paramNode->varDeclList.varDeclList;
         }
     }
 ;
+
 
 FunctionFooter:
     RBRACE {
@@ -643,7 +645,7 @@ int main() {
         // --- (2) Generate MIPS directly from the AST + symbol tables ---
         printf("\n----- GENERATING MIPS CODE -----\n");
         // Then generate MIPS from the TAC
-        generateMIPSFromTAC(tacHead, scopeListHead, "output.s");
+        generateMIPSFromTAC(tacHead, "output.s");
 
         printf("[INFO] MIPS code generated in output.s\n");
 

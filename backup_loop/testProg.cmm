@@ -1,8 +1,0 @@
-int x;
-int z;
-
-x = 6;
-z = 3 * (5 + 2);
-
-write x;
-write z;
