@@ -9,6 +9,16 @@
 static int intTempCounter = 0;
 static int floatTempCounter = 0;
 
+// ----------------------------------------------------------------------------
+// 1.1) Label counter for generating unique labels
+// ----------------------------------------------------------------------------
+static int labelCounter = 0;
+
+// Helper function to generate a unique label suffix
+static int getNextLabel() {
+    return labelCounter++;
+}
+
 // Generate a fresh int temp: t_0, t_1, ...
 static char* newIntTemp(void) {
     char* buffer = (char*)malloc(20);
@@ -254,17 +264,32 @@ TAC* generateTAC(ASTNode* node, char* target) {
             char* condTemp = newIntTemp(); // Condition often is int (0 or 1)
             code = appendTAC(code, generateTAC(node->ifStmt.condition, condTemp));
 
-            char* labelThen = strdup("L_then");
-            char* labelEnd = strdup("L_end");
-            code = appendTAC(code, createTAC("if", condTemp, NULL, labelThen));
+            // Generate unique suffix for labels
+            int currentLabel = getNextLabel();
 
+            // Create unique labels using the suffix
+            char labelThen[20];
+            char labelEnd[20];
+            sprintf(labelThen, "L_then_%d", currentLabel);
+            sprintf(labelEnd, "L_end_%d", currentLabel);
+
+            // Append TAC for conditional jump to 'then' label
+            code = appendTAC(code, createTAC("if", condTemp, NULL, strdup(labelThen)));
+
+            // Handle 'else' statement if it exists
             if (node->ifStmt.elseStmt) {
+                // Generate TAC for 'else' block
                 code = appendTAC(code, generateTAC(node->ifStmt.elseStmt, NULL));
+                // After 'else' block, jump to end label
+                code = appendTAC(code, createTAC("goto", NULL, NULL, strdup(labelEnd)));
             }
-            code = appendTAC(code, createTAC("goto", NULL, NULL, labelEnd));
-            code = appendTAC(code, createTAC("label", NULL, NULL, labelThen));
+
+            // 'then' label
+            code = appendTAC(code, createTAC("label", NULL, NULL, strdup(labelThen)));
+            // Generate TAC for 'then' block
             code = appendTAC(code, generateTAC(node->ifStmt.thenStmt, NULL));
-            code = appendTAC(code, createTAC("label", NULL, NULL, labelEnd));
+            // 'end' label
+            code = appendTAC(code, createTAC("label", NULL, NULL, strdup(labelEnd)));
             break;
         }
 
@@ -316,24 +341,36 @@ TAC* generateTAC(ASTNode* node, char* target) {
         }
 
         case NodeType_WhileStmt: {
-            char* startLabel = (char*)malloc(20);
-            char* endLabel   = (char*)malloc(20);
-            sprintf(startLabel, "L_while_start_%d", intTempCounter++);
-            sprintf(endLabel,   "L_while_end_%d",   intTempCounter++);
+            // Generate unique suffix for labels
+            int currentLabel = getNextLabel();
 
-            code = appendTAC(code, createTAC("label", NULL, NULL, startLabel));
+            // Create unique labels using the suffix
+            char startLabel[25];
+            char endLabel[25];
+            sprintf(startLabel, "L_while_start_%d", currentLabel);
+            sprintf(endLabel, "L_while_end_%d", currentLabel);
+
+            // 'start' label
+            code = appendTAC(code, createTAC("label", NULL, NULL, strdup(startLabel)));
 
             // Condition typically in an int register
             char* condTemp = newIntTemp();
             code = appendTAC(code, generateTAC(node->whileStmt.condition, condTemp));
 
-            code = appendTAC(code, createTAC("ifFalse", condTemp, NULL, endLabel));
+            // Conditional jump to 'end' label if condition is false
+            code = appendTAC(code, createTAC("ifFalse", condTemp, NULL, strdup(endLabel)));
+
+            // Generate TAC for loop body
             TAC* bodyCode = generateTAC(node->whileStmt.body, NULL);
             if (bodyCode) {
                 code = appendTAC(code, bodyCode);
             }
-            code = appendTAC(code, createTAC("goto", NULL, NULL, startLabel));
-            code = appendTAC(code, createTAC("label", NULL, NULL, endLabel));
+
+            // Jump back to 'start' label
+            code = appendTAC(code, createTAC("goto", NULL, NULL, strdup(startLabel)));
+
+            // 'end' label
+            code = appendTAC(code, createTAC("label", NULL, NULL, strdup(endLabel)));
             break;
         }
 

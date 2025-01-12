@@ -401,8 +401,7 @@ float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
             return leftVal * rightVal;
         } else if (strcmp(expr->expr.operator, "/") == 0) {
             if (rightVal == 0) {
-                fprintf(stderr, "Error: Division by zero.\n");
-                exit(EXIT_FAILURE);
+                printf("[WARNING] Dividing by zero.");
             }
             printf("[DEBUG] Expression evaluated: %f / %f\n", leftVal, rightVal);
             return leftVal / rightVal;

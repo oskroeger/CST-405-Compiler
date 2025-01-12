@@ -1,21 +1,148 @@
-function add(int a, float b) {
-    int c;
-    float d;
 
-    c = a + 2;
-    d = 4.2 + 5.1;
-
-    write d;
-
-    return c + 5;
+// Function to print an integer
+function printInt(int a) {
+    write a; // Print the integer followed by a newLine
 }
 
-int x;
-float y;
+// Function to compute the sum of two integers with additional logic
+function computeSum(int a, int b) {
+    int sum;
+    int doubleSum;
+    int temp;
+    int testInt;
 
-x = add(4, 7.3);
+    testInt = 4;
 
-y = 4.7 * 3.2;
+    sum = a + b; // compute sum
+    temp = sum + 5; // Add constant
+    doubleSum = temp * 2; // Double the sum
 
-write x;
-write y;
+    if (doubleSum > 50) {
+        testInt = testInt + 10; // Update variable
+    }
+    else {
+        testInt = testInt - 5; // Alternative Update
+    }
+
+    write testInt;
+    write doubleSum;
+
+    return doubleSum;
+}
+
+// Function to display results with additional logic
+function displayResult(int a) {
+    int localCopy;
+    int printed;
+
+    // Copy result to local variable and perform operations
+    localCopy = a;
+    localCopy = localCopy + 1;
+
+    if ((localCopy / 2) != 0) {
+        printed = 5; // Assign variable to be printed
+    }
+    else {
+        printed = 0; // Alternate assignment
+    }
+
+    write printed;
+
+    localCopy = localCopy * 3;
+    write localCopy;
+}
+
+// Function to multiply two integers with added complexity
+function multiply(int a, int b) {
+    int product;
+    int square;
+    int tempResult;
+    int test;
+
+    product = a * b; // Compute product
+    square = a * a; // Compute square of x 
+    tempResult = product + square; // Combine results
+    test = a;
+
+    if (tempResult > 50) {
+        test = test / 2; // Adjust test
+    }
+    else {
+        test = 18;
+    }
+
+    write test;
+    printInt(tempResult); // Print multiplication result
+    return tempResult;
+}
+
+// Function to calculate the factorial of a number
+function factorial(int a) {
+    int result;
+
+    if (a <= 1) {
+        printInt(1); // Print the base case result
+        return 1;
+    }
+    else {
+        result = a * factorial(a - 1); // Recursive calculate
+        printInt(result); // Print intermediate factorial var_doubleSum
+        return result;
+    }
+}
+
+
+function main() {
+
+    int i;
+    int result;
+    int temp;
+
+    int localInt;
+    int localIntTwo;
+
+    localInt = 15;
+    localIntTwo = 7;
+
+    // Call function on int
+    printInt(localInt);
+
+    // Complex arithmetic expression
+    result = (localInt * 2 + 3) / (5 - 2) + localIntTwo;
+    write result;
+
+    // If statment
+    if (result > 10) {
+        temp = result * 2; // Additional computation
+        displayResult(temp);
+    }
+    else {
+        temp = result - 1;
+        displayResult(temp + 3);
+    }
+
+    // While Loop with nested logic
+    i = 0;
+    while (i < 10) {
+        result = multiply(i, i + 1); // Function call inside loop
+
+        // If inside while
+        if (result > 20) { 
+            localInt = result; // Update variable
+            i = 21;
+        }
+        else {
+            localInt = localInt + 1;
+        }
+
+        printInt(i); // Print loop counter
+        i = i + 1;
+    }
+
+    computeSum(2, 6);
+    displayResult(7);
+    multiply(2, 5);
+    factorial(6);
+}
+
+main();
