@@ -83,32 +83,55 @@ var_t_91: .word 0
 var_t_89: .word 0
 var_t_92: .word 0
 var_t_93: .word 0
-var_t_95: .word 0
-var_t_96: .word 0
 var_t_94: .word 0
-var_t_98: .word 0
-var_t_100: .word 0
-var_t_101: .word 0
-var_t_99: .word 0
+var_t_96: .word 0
 var_t_97: .word 0
-var_t_103: .word 0
-var_t_104: .word 0
+var_t_95: .word 0
+var_t_99: .word 0
+var_t_101: .word 0
 var_t_102: .word 0
-var_t_106: .word 0
-var_t_107: .word 0
+var_t_100: .word 0
+var_t_98: .word 0
+var_t_104: .word 0
 var_t_105: .word 0
+var_t_103: .word 0
+var_t_107: .word 0
 var_t_108: .word 0
+var_t_106: .word 0
 var_t_109: .word 0
 var_t_110: .word 0
-var_t_112: .word 0
-var_t_113: .word 0
 var_t_111: .word 0
+var_t_113: .word 0
 var_t_114: .word 0
+var_t_112: .word 0
 var_t_115: .word 0
 var_t_116: .word 0
 var_t_117: .word 0
 var_t_118: .word 0
 var_t_119: .word 0
+var_t_120: .word 0
+var_t_121: .word 0
+var_t_122: .word 0
+var_t_124: .word 0
+var_t_126: .word 0
+var_t_127: .word 0
+var_t_125: .word 0
+var_t_123: .word 0
+var_t_130: .word 0
+var_t_129: .word 0
+var_t_131: .word 0
+var_t_128: .word 0
+var_t_133: .word 0
+var_t_132: .word 0
+var_t_135: .word 0
+var_t_136: .word 0
+var_t_134: .word 0
+var_t_137: .word 0
+var_t_138: .word 0
+var_t_139: .word 0
+var_t_140: .word 0
+var_t_142: .word 0
+var_t_141: .word 0
 var_a: .word 0
 var_testInt: .word 0
 var_b: .word 0
@@ -125,6 +148,10 @@ var_result: .word 0
 var_localInt: .word 0
 var_localIntTwo: .word 0
 var_i: .word 0
+var_x: .word 0
+var_y: .word 0
+var_z: .word 0
+var_arr: .word 0, 0, 0, 0, 0
 
 .text
 func_printInt:
@@ -584,115 +611,223 @@ L_then_4:
     move $a0, $s0
     jal func_displayResult
 L_end_4:
-    li $s0, 0
+    li $s0, 6
     sw $s0, var_t_93
     lw $s0, var_t_93
+    move $a0, $s0
+    jal func_factorial
+    li $s0, 0
+    sw $s0, var_t_94
+    lw $s0, var_t_94
     sw $s0, var_i
 L_while_start_5:
     lw $s0, var_i
-    sw $s0, var_t_95
-    li $s0, 10
     sw $s0, var_t_96
-    lw $s0, var_t_95
-    lw $s1, var_t_96
+    li $s0, 10
+    sw $s0, var_t_97
+    lw $s0, var_t_96
+    lw $s1, var_t_97
     slt $t9, $s0, $s1
-    sw $t9, var_t_94
-    lw $s0, var_t_94
+    sw $t9, var_t_95
+    lw $s0, var_t_95
     beq $s0, $zero, L_while_end_5
     lw $s0, var_i
-    sw $s0, var_t_98
-    lw $s0, var_t_98
+    sw $s0, var_t_99
+    lw $s0, var_t_99
     move $a0, $s0
     lw $s0, var_i
-    sw $s0, var_t_100
-    li $s0, 1
     sw $s0, var_t_101
-    lw $s0, var_t_100
-    lw $s1, var_t_101
+    li $s0, 1
+    sw $s0, var_t_102
+    lw $s0, var_t_101
+    lw $s1, var_t_102
     add $t9, $s0, $s1
-    sw $t9, var_t_99
-    lw $s0, var_t_99
+    sw $t9, var_t_100
+    lw $s0, var_t_100
     move $a1, $s0
     jal func_multiply
-    sw $v0, var_t_97
-    lw $s0, var_t_97
+    sw $v0, var_t_98
+    lw $s0, var_t_98
     sw $s0, var_result
     lw $s0, var_result
-    sw $s0, var_t_103
-    li $s0, 20
     sw $s0, var_t_104
-    lw $s0, var_t_103
-    lw $s1, var_t_104
+    li $s0, 20
+    sw $s0, var_t_105
+    lw $s0, var_t_104
+    lw $s1, var_t_105
     slt $t9, $s1, $s0
-    sw $t9, var_t_102
-    lw $s0, var_t_102
+    sw $t9, var_t_103
+    lw $s0, var_t_103
     bne $s0, $zero, L_then_6
     lw $s0, var_localInt
-    sw $s0, var_t_106
-    li $s0, 1
     sw $s0, var_t_107
-    lw $s0, var_t_106
-    lw $s1, var_t_107
+    li $s0, 1
+    sw $s0, var_t_108
+    lw $s0, var_t_107
+    lw $s1, var_t_108
     add $t9, $s0, $s1
-    sw $t9, var_t_105
-    lw $s0, var_t_105
+    sw $t9, var_t_106
+    lw $s0, var_t_106
     sw $s0, var_localInt
     j L_end_6
 L_then_6:
     lw $s0, var_result
-    sw $s0, var_t_108
-    lw $s0, var_t_108
-    sw $s0, var_localInt
-    li $s0, 21
     sw $s0, var_t_109
     lw $s0, var_t_109
+    sw $s0, var_localInt
+    li $s0, 21
+    sw $s0, var_t_110
+    lw $s0, var_t_110
     sw $s0, var_i
 L_end_6:
     lw $s0, var_i
-    sw $s0, var_t_110
-    lw $s0, var_t_110
+    sw $s0, var_t_111
+    lw $s0, var_t_111
     move $a0, $s0
     jal func_printInt
     lw $s0, var_i
-    sw $s0, var_t_112
-    li $s0, 1
     sw $s0, var_t_113
-    lw $s0, var_t_112
-    lw $s1, var_t_113
+    li $s0, 1
+    sw $s0, var_t_114
+    lw $s0, var_t_113
+    lw $s1, var_t_114
     add $t9, $s0, $s1
-    sw $t9, var_t_111
-    lw $s0, var_t_111
+    sw $t9, var_t_112
+    lw $s0, var_t_112
     sw $s0, var_i
     j L_while_start_5
 L_while_end_5:
     li $s0, 2
-    sw $s0, var_t_114
-    lw $s0, var_t_114
-    move $a0, $s0
-    li $s0, 6
     sw $s0, var_t_115
     lw $s0, var_t_115
+    move $a0, $s0
+    li $s0, 6
+    sw $s0, var_t_116
+    lw $s0, var_t_116
     move $a1, $s0
     jal func_computeSum
     li $s0, 7
-    sw $s0, var_t_116
-    lw $s0, var_t_116
-    move $a0, $s0
-    jal func_displayResult
-    li $s0, 2
     sw $s0, var_t_117
     lw $s0, var_t_117
     move $a0, $s0
-    li $s0, 5
+    jal func_displayResult
+    li $s0, 2
     sw $s0, var_t_118
     lw $s0, var_t_118
-    move $a1, $s0
-    jal func_multiply
-    li $s0, 6
+    move $a0, $s0
+    li $s0, 5
     sw $s0, var_t_119
     lw $s0, var_t_119
+    move $a1, $s0
+    jal func_multiply
+    li $s0, 0
+    sw $s0, var_t_120
+    li $s0, 4
+    sw $s0, var_t_121
+    la $s7, var_arr
+    lw $s0, var_t_120
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $s1, var_t_121
+    sw $s1, 0($t0)
+    li $s0, 1
+    sw $s0, var_t_122
+    li $s0, 5
+    sw $s0, var_t_124
+    li $s0, 2
+    sw $s0, var_t_126
+    li $s0, 4
+    sw $s0, var_t_127
+    lw $s0, var_t_126
+    lw $s1, var_t_127
+    add $t9, $s0, $s1
+    sw $t9, var_t_125
+    lw $s0, var_t_124
+    lw $s1, var_t_125
+    mul $t9, $s0, $s1
+    sw $t9, var_t_123
+    la $s7, var_arr
+    lw $s0, var_t_122
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $s1, var_t_123
+    sw $s1, 0($t0)
+    li $s0, 0
+    sw $s0, var_t_130
+    la $s7, var_arr
+    lw $s0, var_t_130
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $t9, 0($t0)
+    sw $t9, var_t_129
+    li $s0, 2
+    sw $s0, var_t_131
+    lw $s0, var_t_129
+    lw $s1, var_t_131
+    add $t9, $s0, $s1
+    sw $t9, var_t_128
+    lw $s0, var_t_128
+    sw $s0, var_x
+    li $s0, 1
+    sw $s0, var_t_133
+    la $s7, var_arr
+    lw $s0, var_t_133
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $t9, 0($t0)
+    sw $t9, var_t_132
+    lw $s0, var_t_132
+    sw $s0, var_y
+    lw $s0, var_y
+    sw $s0, var_t_135
+    li $s0, 20
+    sw $s0, var_t_136
+    lw $s0, var_t_135
+    lw $s1, var_t_136
+    slt $t9, $s1, $s0
+    sw $t9, var_t_134
+    lw $s0, var_t_134
+    bne $s0, $zero, L_then_7
+    li $s0, 2
+    sw $s0, var_t_137
+    li $s0, 9
+    sw $s0, var_t_138
+    la $s7, var_arr
+    lw $s0, var_t_137
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $s1, var_t_138
+    sw $s1, 0($t0)
+    j L_end_7
+L_then_7:
+    li $s0, 2
+    sw $s0, var_t_139
+    li $s0, 8
+    sw $s0, var_t_140
+    la $s7, var_arr
+    lw $s0, var_t_139
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $s1, var_t_140
+    sw $s1, 0($t0)
+L_end_7:
+    li $s0, 2
+    sw $s0, var_t_142
+    la $s7, var_arr
+    lw $s0, var_t_142
+    sll $t0, $s0, 2
+    add $t0, $s7, $t0
+    lw $t9, 0($t0)
+    sw $t9, var_t_141
+    lw $s0, var_t_141
+    sw $s0, var_z
+    lw $s0, var_z
     move $a0, $s0
-    jal func_factorial
+    li $v0, 1
+    syscall
+    li $a0, 10
+    li $v0, 11
+    syscall
 endfunc_main:
     move $sp, $fp
     lw $fp, 0($sp)

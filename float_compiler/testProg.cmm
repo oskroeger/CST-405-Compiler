@@ -98,6 +98,11 @@ function main() {
     int result;
     int temp;
 
+    int arr[5];
+    int x;
+    int y;
+    int z;
+
     int localInt;
     int localIntTwo;
 
@@ -121,6 +126,8 @@ function main() {
         displayResult(temp + 3);
     }
 
+    factorial(6);
+
     // While Loop with nested logic
     i = 0;
     while (i < 10) {
@@ -142,7 +149,21 @@ function main() {
     computeSum(2, 6);
     displayResult(7);
     multiply(2, 5);
-    factorial(6);
+
+    arr[0] = 4;
+    arr[1] = 5 * (2 + 4);
+
+    x = arr[0] + 2;
+    y = arr[1];
+
+    if (y > 20) {
+        arr[2] = 8;
+    }
+    else {
+        arr[2] = 9;
+    }
+    z = arr[2];
+    write z;
 }
 
 main();
