@@ -86,21 +86,27 @@ endfunc_sub:
 main:
     l.s $f0, var_f_0
     s.s $f0, var_p
-    la   $t0, LC_flt_0
-    l.s  $f0, 0($t0)
-    s.s $f0, var_f_1
-    l.s $f0, var_f_1
-    s.s $f0, var_q
-    l.s $f0, var_p
-    s.s $f0, var_f_3
-    l.s $f0, var_q
-    s.s $f0, var_f_4
-    l.s $f0, var_f_3
-    l.s $f1, var_f_4
-    add.s $f2, $f0, $f1
-    s.s $f2, var_f_2
-    l.s $f0, var_f_2
-    s.s $f0, var_pq
+.data
+LC_flt_0: .float 2.300000
+LC_flt_1: .float 1.100000
+.text
+    la $t0, LC_flt_0
+    la $t1, LC_flt_1
+    # Load 2.3 into $f0 and store in var_q
+    l.s $f0, 0($t0)        # Load the float value 2.3 into $f0
+    s.s $f0, var_q         # Store the float value into var_q
+
+    # Load 1.1 into $f0 and store in var_p
+    l.s $f0, 0($t1)        # Load the float value 1.1 into $f0
+    s.s $f0, var_p         # Store the float value into var_p
+
+    # Perform the addition: var_p + var_q
+    l.s $f0, var_p         # Load var_p (1.1) into $f0
+    l.s $f1, var_q         # Load var_q (2.3) into $f1
+    add.s $f2, $f0, $f1    # Add $f0 and $f1, store result in $f2
+
+    # Store the result in var_pq
+    s.s $f2, var_pq        # Store the result (3.4) into var_pq
     li $s0, 4
     move $t6, $s0
     move $s0, $t6
