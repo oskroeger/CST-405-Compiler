@@ -29,6 +29,7 @@ typedef struct Symbol {
     SymbolType type;
     SymbolValue value;
     int size;
+    int isParameter;          // New flag to indicate if the symbol is a parameter
     struct Symbol* next;
 } Symbol;
 
@@ -66,6 +67,10 @@ void exitScope();        // Exits the current scope
 void addSymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue value);
 void addArraySymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue value, int size);
 void addFunctionSymbol(SymbolTable* table, char* name);
+
+// New function to add parameter symbols
+void addParameterSymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue value);
+
 Symbol* lookupSymbol(SymbolTable* table, char* name);
 void printSymbolTable(const ScopeNode* scopeListHead);
 

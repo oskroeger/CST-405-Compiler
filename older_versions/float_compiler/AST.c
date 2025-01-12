@@ -326,15 +326,37 @@ float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
         // Handle simple variable access (int or float)
         Symbol* sym = lookupSymbol(symTab, expr->simpleID.name);
         if (sym != NULL) {
-            if (sym->type == TYPE_INT && sym->value.intValue != INT_MIN) {
-                printf("[DEBUG] Simple ID '%s' evaluated to %d\n", sym->name, sym->value.intValue);
-                return (float) sym->value.intValue;
-            } else if (sym->type == TYPE_FLOAT && sym->value.floatValue != FLT_MIN) {
-                printf("[DEBUG] Simple ID '%s' evaluated to %f\n", sym->name, sym->value.floatValue);
-                return sym->value.floatValue;
-            } else {
-                fprintf(stderr, "Error: Variable '%s' used before being defined.\n", expr->simpleID.name);
-                exit(EXIT_FAILURE);
+            if (sym->type == TYPE_INT) {
+                if (sym->isParameter || sym->value.intValue != INT_MIN) {
+                    if (sym->isParameter) {
+                        // Parameters do not have a known value at compile time
+                        // You can choose to handle this by generating code or using a placeholder
+                        fprintf(stderr, "Warning: Parameter '%s' used in expression cannot be evaluated at compile time.\n", sym->name);
+                        // For simplicity, return 0.0 or handle appropriately
+                        return 0.0f;
+                    } else {
+                        printf("[DEBUG] Simple ID '%s' evaluated to %d\n", sym->name, sym->value.intValue);
+                        return (float) sym->value.intValue;
+                    }
+                } else {
+                    fprintf(stderr, "Error: Variable '%s' used before being defined.\n", expr->simpleID.name);
+                    exit(EXIT_FAILURE);
+                }
+            } else if (sym->type == TYPE_FLOAT) {
+                if (sym->isParameter || sym->value.floatValue != FLT_MIN) {
+                    if (sym->isParameter) {
+                        // Parameters do not have a known value at compile time
+                        fprintf(stderr, "Warning: Parameter '%s' used in expression cannot be evaluated at compile time.\n", sym->name);
+                        // For simplicity, return 0.0 or handle appropriately
+                        return 0.0f;
+                    } else {
+                        printf("[DEBUG] Simple ID '%s' evaluated to %f\n", sym->name, sym->value.floatValue);
+                        return sym->value.floatValue;
+                    }
+                } else {
+                    fprintf(stderr, "Error: Variable '%s' used before being defined.\n", expr->simpleID.name);
+                    exit(EXIT_FAILURE);
+                }
             }
         } else {
             fprintf(stderr, "Error: Variable '%s' used before declaration.\n", expr->simpleID.name);
@@ -409,9 +431,9 @@ float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
     } else if (expr->type == NodeType_FunctionCall) {
         // For simplicity, function calls return 0.0 in expression evaluation
         printf("[DEBUG] Function call '%s()' in expression (returns 0.0)\n", expr->functionCall.name);
-        return 0.0;
+        return 0.0f;
     }
 
     // Return 0.0 if no valid expression type was matched (fail-safe)
-    return 0.0;
+    return 0.0f;
 }

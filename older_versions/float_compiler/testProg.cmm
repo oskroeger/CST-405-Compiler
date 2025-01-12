@@ -1,0 +1,21 @@
+function add(int a, float b) {
+    int c;
+    float d;
+
+    c = a + 2;
+    d = 4.2 + 5.1;
+
+    write d;
+
+    return c + 5;
+}
+
+int x;
+float y;
+
+x = add(4, 7.3);
+
+y = 4.7 * 3.2;
+
+write x;
+write y;
