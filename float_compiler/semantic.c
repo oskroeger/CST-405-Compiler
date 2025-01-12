@@ -118,9 +118,6 @@ TAC* appendTAC(TAC* head, TAC* newTAC) {
     return head;
 }
 
-// Forward declaration for handling arguments in function calls
-static TAC* generateArgs(ASTNode* args);
-
 TAC* generateTAC(ASTNode* node, char* target) {
     if (!node) return NULL;
     TAC* code = NULL;

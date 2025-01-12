@@ -1,4 +1,3 @@
-
 // Function to print an integer
 function printInt(int a) {
     write a; // Print the integer followed by a newLine
