@@ -45,6 +45,45 @@ static int labelCounter = 0;
 // Current function tracking
 static char currentFunctionEndLabel[64] = "";
 
+// --------------------------------------------------------------------------
+
+// A global or static structure to track float constants
+typedef struct {
+    float value;
+    char label[32];  // e.g. "LC_flt_0"
+} FloatConst;
+
+static FloatConst g_floatConsts[100]; 
+static int g_numFloatConsts = 0;
+
+// Return label name (e.g. "LC_flt_5") for the float value
+const char* getFloatLabel(float val) {
+    // Check if val already in g_floatConsts
+    for (int i = 0; i < g_numFloatConsts; i++) {
+        if (g_floatConsts[i].value == val) {
+            return g_floatConsts[i].label;
+        }
+    }
+    // If not found, create new
+    sprintf(g_floatConsts[g_numFloatConsts].label, "LC_flt_%d", g_numFloatConsts);
+    g_floatConsts[g_numFloatConsts].value = val;
+    g_numFloatConsts++;
+    return g_floatConsts[g_numFloatConsts - 1].label;
+}
+
+static void printAllFloatConsts(FILE* out) {
+    fprintf(out, ".data\n");
+    // Print out each float constant
+    for (int i = 0; i < g_numFloatConsts; i++) {
+        fprintf(out, "%s: .float %f\n", 
+                   g_floatConsts[i].label, 
+                   g_floatConsts[i].value);
+    }
+    fprintf(out, "\n.text\n");
+}
+
+// --------------------------------------------------------------------------
+
 // Helper to see if a name is already in g_globalNames
 static int isGlobalKnown(const char* name) {
     for (int i = 0; i < g_numGlobals; i++) {
@@ -460,7 +499,67 @@ static const char* loadArg(const char* arg, const char* scratch, FILE* out) {
     return "$zero";
 }
 
-static const char* loadFloatArg(const char* arg, const char* fReg, FILE* out) {
+static const char* loadFloatArg(const char* arg, const char* fScratch, FILE* out) {
+    if (!arg) return fScratch;  // if there's no argument, just return the float register
+
+    // 1) Check if the argument is a float literal, e.g. "2.3"
+    char* endp;
+    float val = strtof(arg, &endp);
+    if (*endp == '\0') {
+        // It's a numeric float literal
+        //
+        // (A) Create or reuse a label in .data for this float (like LC_flt_0).
+        // (B) la $t0, LC_flt_0
+        // (C) l.s $fScratch, 0($t0)
+        const char* label = getFloatLabel(val); // e.g. "LC_flt_0"
+        fprintf(out, "    la   $t0, %s\n", label);
+        fprintf(out, "    l.s  %s, 0($t0)\n", fScratch);
+        return fScratch;
+    }
+
+    // 2) If the argument is a float *temp* (like f_5 or ft_5)
+    if (isTempName(arg) == 2) {
+        const char* reg = getRegIfAny(arg);   // see if in a dedicated $fX register
+        if (reg) {
+            // If you store float temps directly in a float register, do something like "mov.s"
+            // MIPS doesn’t have a direct 'move' for floats but you can do "mov.s $fScratch, $f2"
+            // or "cvt.s.s" in some toolchains.  Usually, it’s "mov.s $fScratch, <reg>".
+            // For SPIM or MARS, there's a pseudo-instruction "mov.s" for registers:
+            fprintf(out, "    mov.s %s, %s\n", fScratch, reg);
+            return fScratch;
+        } 
+        else if (isSpilled(arg)) {
+            // If spilled, we stored it in memory (var_f_5). So do l.s:
+            char* spillLabel = getSpillLabel(arg);  // e.g. "var_f_5"
+            fprintf(out, "    l.s %s, %s\n", fScratch, spillLabel);
+            free(spillLabel);
+            return fScratch;
+        }
+    }
+
+    // 3) If it's a float array reference, you'd do something like:
+    if (isArrayKnown(arg)) {
+        // la $s7, var_<arg>  (or however you handle float arrays)
+        fprintf(out, "    la $s7, var_%s\n", arg);
+        return "$s7"; 
+    }
+
+    // 4) If it's a user-defined float variable (e.g., "x" that the symbol table says is float)
+    //    -> we do "l.s fScratch, var_x"
+    char* g = makeGlobalName(arg);  // e.g. "var_x"
+    if (g) {
+        fprintf(out, "    l.s %s, %s\n", fScratch, g);
+        free(g);
+        return fScratch;
+    }
+
+    // If all else fails:
+    fprintf(stderr, "[ERROR] loadFloatArg: unable to load '%s'\n", arg);
+    return fScratch;
+}
+
+
+/*static const char* loadFloatArg(const char* arg, const char* fReg, FILE* out) {
     if (!arg) return fReg;
 
     // 1) Check if `arg` is a float literal
@@ -488,6 +587,8 @@ static const char* loadFloatArg(const char* arg, const char* fReg, FILE* out) {
         fprintf(out, "    la $t0, %s\n", labelName);
         fprintf(out, "    l.s %s, 0($t0)\n", fReg);
         return fReg;
+
+
     }
 
     // 2) If arg is a temp like t_5 or ft_5
@@ -542,7 +643,7 @@ static const char* loadFloatArg(const char* arg, const char* fReg, FILE* out) {
     // If all else fails:
     fprintf(stderr, "[ERROR] loadFloatArg: could not handle arg '%s'\n", arg);
     return fReg;
-}
+} */
 
 
 static void storeResult(const char* dest, const char* srcReg, FILE* out) {

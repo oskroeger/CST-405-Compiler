@@ -18,8 +18,8 @@ int arr[5];
 float p;
 float q;
 float pq;
-p= 1.1;
-q= 2.3;
+p= 2.3;
+q= 1.1;
 pq =p+q;
 
 
