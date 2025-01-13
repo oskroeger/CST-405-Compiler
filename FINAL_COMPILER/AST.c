@@ -330,9 +330,9 @@ float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
                 if (sym->isParameter || sym->value.intValue != INT_MIN) {
                     if (sym->isParameter) {
                         // Parameters do not have a known value at compile time
-                        // You can choose to handle this by generating code or using a placeholder
+                        // We can handle this by generating code or using a placeholder
                         fprintf(stderr, "Warning: Parameter '%s' used in expression cannot be evaluated at compile time.\n", sym->name);
-                        // For simplicity, return 0.0 or handle appropriately
+                        // For simplicity, return 0.0
                         return 0.0f;
                     } else {
                         printf("[DEBUG] Simple ID '%s' evaluated to %d\n", sym->name, sym->value.intValue);
@@ -347,7 +347,7 @@ float evaluateExpr(ASTNode* expr, SymbolTable* symTab) {
                     if (sym->isParameter) {
                         // Parameters do not have a known value at compile time
                         fprintf(stderr, "Warning: Parameter '%s' used in expression cannot be evaluated at compile time.\n", sym->name);
-                        // For simplicity, return 0.0 or handle appropriately
+                        // For simplicity, return 0.0
                         return 0.0f;
                     } else {
                         printf("[DEBUG] Simple ID '%s' evaluated to %f\n", sym->name, sym->value.floatValue);

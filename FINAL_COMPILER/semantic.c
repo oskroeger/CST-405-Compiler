@@ -66,37 +66,23 @@ static DataType getASTNodeDataType(ASTNode* node) {
             }
         }
 
-        // For a simple ID, array access, etc., you may want to rely on
-        // a symbol table or some annotation.  For simplicity, if you've
-        // annotated your AST so that a float variable is known to be NodeType_FloatExpr,
-        // then you could do a simpler check.  Otherwise, you can default to int
-        // or do a symbol-table lookup here if you have that data. For now:
+        // For simplicity, the AST is annotated so that a float variable is known 
+        // to be NodeType_FloatExpr, so that we could do a simpler check. 
+        // Otherwise, we can default to int or do a symbol-table lookup here.
         case NodeType_SimpleID:
         case NodeType_ArrayAccess:
         case NodeType_AssignStmt:
         case NodeType_FunctionCall:
         {
-            // If in your compiler you have a proper type-check pass, 
-            // you'd do a lookup here. 
             // For minimal changes, let's say "expressions are determined by their children",
-            // so if we can't figure it out, default to int (or do something else).
             return DataType_Int;
         }
 
-        // You can add more logic for arrays, if statements, etc. 
-        // Typically, conditions are booleans, but we’re ignoring that
-        // for now since your code is all typed as int/float.
-
+        // Default to int
         default:
             return DataType_Int;
     }
 }
-
-// ----------------------------------------------------------------------------
-// The rest of the TAC logic remains almost identical to your original code.
-// We only replaced (char* target ? target : newTemp()) with newTempByType(...)
-// based on the node's data type where appropriate.
-// ----------------------------------------------------------------------------
 
 // Helper to create a TAC node
 TAC* createTAC(char* operator, char* arg1, char* arg2, char* result) {
@@ -154,15 +140,13 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
         case NodeType_AssignStmt: {
             /*
-             * We'll assume the type of the final assigned expression
+             * We assume the type of the final assigned expression
              * dictates which register we need for the RHS. 
-             * (If you have a symbol table to check varName’s type, you could do that, too.)
              */
             DataType rhsType = getASTNodeDataType(node->assignStmt.expr);
 
             if (node->assignStmt.isArray) {
                 // Generate code for array index in an int register (most likely).
-                // If your language only allows int indexes, that’s easy:
                 char* indexTemp = newIntTemp(); 
                 code = appendTAC(code, generateTAC(node->assignStmt.arrayIndex, indexTemp));
 
@@ -229,9 +213,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
         case NodeType_SimpleID: {
             /*
-             * If you have a type system, you'd figure out if this ID is int or float.
-             * For the example, we'll assume it's int (or default). 
-             * If you have a symbol table that knows 'y' is float, you might do newFloatTemp().
+             * We assume it's int (or default). 
              */
             DataType idType = DataType_Int; 
             char* resultTemp = target ? target : newTempByType(idType);
@@ -241,7 +223,6 @@ TAC* generateTAC(ASTNode* node, char* target) {
 
         case NodeType_ArrayAccess: {
             /*
-             * Similarly, to properly handle float arrays, do a symbol-table lookup here.
              * For now, treat arrays as int by default. 
              */
             DataType arrType = DataType_Int;
@@ -331,7 +312,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
             code = appendTAC(code, argCode);
 
             // If function returns a value and we care about it, store in target
-            // We assume function returns int only (per your requirement).
+            // We assume function returns int only.
             char* resultTemp = target ? target : NULL; 
             code = appendTAC(code, createTAC("call", node->functionCall.name, NULL, resultTemp));
             break;
@@ -379,6 +360,7 @@ TAC* generateTAC(ASTNode* node, char* target) {
     return code;
 }
 
+// Function to print out TAC in neat, accurate, and readable format
 void printTAC(TAC* tac) {
     TAC* current = tac;
     while (current) {

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "semantic.h" // Ensure this includes the TAC definition and other necessary headers
+#include "semantic.h" // Includes the TAC definition and other necessary headers
 
 // --------------------------------------------------------------------------
 // 1) Data structures for register/spill management

@@ -13,8 +13,7 @@ typedef struct TAC {
 } TAC;
 
 /* 
- * Simple enum to represent the data type of an AST node: int or float.
- * (You can expand this if you want boolean, etc.)
+ * Enum to represent the data type of an AST node: int or float.
  */
 typedef enum {
     DataType_Int,

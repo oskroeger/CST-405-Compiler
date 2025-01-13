@@ -189,6 +189,7 @@ void addArraySymbol(SymbolTable* table, char* name, SymbolType type, SymbolValue
     table->table[hashval] = newSymbol;
 }
 
+// Function to add function symbol to table
 void addFunctionSymbol(SymbolTable* table, char* name) {
     if (table == NULL || table->table == NULL) {
         fprintf(stderr, "Symbol table or table array not initialized\n");
@@ -261,6 +262,7 @@ void addParameterSymbol(SymbolTable* table, char* name, SymbolType type, SymbolV
     table->table[hashval] = newSymbol;
 }
 
+// Function to find a symbol in the table
 Symbol* lookupSymbol(SymbolTable* table, char* name) {
     if (table == NULL || name == NULL) {
         fprintf(stderr, "[ERROR] lookupSymbol called with NULL arguments.\n");
