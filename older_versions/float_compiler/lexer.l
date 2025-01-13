@@ -263,6 +263,11 @@ ws          {delim}+
 
 [ \t]+ { chars += yyleng; } // Consume whitespace and update character count
 
+"//"[^\n]* {
+    /* Ignore everything until (but not including) the newline */
+}
+
+
 . {
         chars++;
         printf("%s : Unrecognized symbol at line %d char %d\n", yytext, yylineno, chars);
